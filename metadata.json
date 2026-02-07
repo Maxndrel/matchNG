@@ -1,0 +1,7 @@
+{
+  "name": "Copy of matchNG - Nigerian Job Matching Engine",
+  "description": "A production-ready MVP for matching Nigerian youth to job opportunities using a 3-factor algorithm (Skills, Location, Trends) tailored for the local labor market.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
