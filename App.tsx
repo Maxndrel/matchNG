@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole } from './types';
 import Layout from './components/Layout';
 import Landing from './pages/Landing';
@@ -20,41 +20,57 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('LANDING');
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Central Sync Listener: This is the ONLY place that should react to 'storage-sync'
+  // to prevent circular dependency crashes.
+  useEffect(() => {
+    const handleSync = () => {
+      const session = getActiveUser();
+      if (JSON.stringify(session) !== JSON.stringify(activeUser)) {
+        setActiveUser(session);
+      }
+    };
+
+    window.addEventListener('storage-sync', handleSync);
+    return () => window.removeEventListener('storage-sync', handleSync);
+  }, [activeUser]);
+
   useEffect(() => {
     initializeStorage();
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      setCurrentPage(session.role === UserRole.SEEKER ? 'DASHBOARD' : 'DASHBOARD');
+      // Ensure we stay on dashboard if logged in
+      if (currentPage === 'LANDING' || currentPage === 'LOGIN' || currentPage === 'REGISTER') {
+        setCurrentPage('DASHBOARD');
+      }
     }
     setIsInitialized(true);
   }, []);
 
   const handleAuthSuccess = (user: UserProfile) => {
-    setActiveUser(user);
-    setStorageActiveUser(user);
     saveUser(user);
+    setStorageActiveUser(user);
+    setActiveUser(user);
     setCurrentPage('DASHBOARD');
   };
 
   const handleLogout = () => {
-    setActiveUser(null);
     setStorageActiveUser(null);
+    setActiveUser(null);
     setCurrentPage('LANDING');
   };
 
-  const handleUpdateUser = (updated: UserProfile) => {
+  const handleUpdateUser = useCallback((updated: UserProfile) => {
+    // Standard data flow: update storage, wait for storage-sync or manual state update
+    saveUser(updated);
     setActiveUser(updated);
-    saveUser(updated); 
-    setStorageActiveUser(updated);
-  };
+  }, []);
 
   useEffect(() => {
     if (!isInitialized) return;
 
     const isDashboardRoute = currentPage === 'DASHBOARD';
     const isAdminRoute = currentPage === 'ADMIN';
-    const isAuthRoute = ['LOGIN', 'REGISTER'].includes(currentPage);
 
     if ((isDashboardRoute || isAdminRoute) && !activeUser) {
       setCurrentPage('LOGIN');
@@ -63,11 +79,6 @@ const App: React.FC = () => {
 
     if (isAdminRoute && activeUser?.role !== UserRole.ADMIN) {
       setCurrentPage('LANDING');
-      return;
-    }
-
-    if (isAuthRoute && activeUser) {
-      setCurrentPage('DASHBOARD');
     }
   }, [currentPage, activeUser, isInitialized]);
 

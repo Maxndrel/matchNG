@@ -10,47 +10,49 @@ const KEYS = {
   TRENDS: 'matchNG_trends_v1'
 };
 
-/**
- * Reactive Sync Event
- * Dispatched whenever storage is mutated to force UI updates
- */
+const _cache = {
+  users: [] as UserProfile[],
+  jobs: [] as Job[],
+  activeUser: null as UserProfile | null,
+  isLoaded: false
+};
+
+// Internal utility to prevent infinite event loops
+let _isInternalUpdate = false;
+
 const notifyStorageChange = () => {
+  if (_isInternalUpdate) return;
   window.dispatchEvent(new Event('storage-sync'));
 };
 
-// Safe JSON Parse wrapper
-const safeParse = <T>(key: string, fallback: T): T => {
+const persist = (key: string, data: any) => {
   try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : fallback;
+    localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
-    console.error(`Storage Corrupted for key: ${key}`, e);
-    return fallback;
+    console.error('matchNG Storage Error:', e);
   }
 };
 
-/**
- * SEEDING & INITIALIZATION
- */
 export const initializeStorage = () => {
-  if (!localStorage.getItem(KEYS.USERS)) {
-    localStorage.setItem(KEYS.USERS, JSON.stringify([MOCK_SEEKER, MOCK_EMPLOYER]));
-  }
-  
-  if (!localStorage.getItem(KEYS.JOBS)) {
-    // Procedural generation of 100 jobs for scalability testing
-    const baseJobs = generateMockJobs(100);
-    localStorage.setItem(KEYS.JOBS, JSON.stringify(baseJobs));
-  }
+  if (_cache.isLoaded) return;
 
-  if (!localStorage.getItem(KEYS.TRENDS)) {
-    localStorage.setItem(KEYS.TRENDS, JSON.stringify(TREND_DATA));
-  }
-  notifyStorageChange();
+  const rawUsers = localStorage.getItem(KEYS.USERS);
+  const rawJobs = localStorage.getItem(KEYS.JOBS);
+  const rawActive = localStorage.getItem(KEYS.ACTIVE_USER);
+
+  _cache.users = rawUsers ? JSON.parse(rawUsers) : [MOCK_SEEKER, MOCK_EMPLOYER];
+  _cache.jobs = rawJobs ? JSON.parse(rawJobs) : generateMockJobs(100);
+  _cache.activeUser = rawActive ? JSON.parse(rawActive) : null;
+
+  if (!rawUsers) persist(KEYS.USERS, _cache.users);
+  if (!rawJobs) persist(KEYS.JOBS, _cache.jobs);
+
+  _cache.isLoaded = true;
 };
 
 const generateMockJobs = (count: number): Job[] => {
   const titles = ['Software Engineer', 'Farm Manager', 'Solar Installer', 'Accountant', 'Sales Lead'];
+  const now = Date.now();
   return Array.from({ length: count }).map((_, i) => ({
     id: `j-gen-${i}`,
     employerId: `e-${i % 5}`,
@@ -71,60 +73,74 @@ const generateMockJobs = (count: number): Job[] => {
     },
     isRemote: i % 4 === 0,
     status: 'OPEN',
-    createdAt: new Date(Date.now() - (i * 86400000)).toISOString(),
+    createdAt: new Date(now - (i * 86400000)).toISOString(),
     salaryRange: `₦${150 + (i % 5) * 50}k - ₦${250 + (i % 5) * 50}k`
   }));
 };
 
-/**
- * CRUD: USERS
- */
-export const getUsers = (): UserProfile[] => safeParse(KEYS.USERS, []);
+export const getUsers = (): UserProfile[] => _cache.users;
 
 export const saveUser = (user: UserProfile) => {
-  const users = getUsers();
-  const idx = users.findIndex(u => u.id === user.id);
-  if (idx > -1) users[idx] = user;
-  else users.push(user);
-  localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+  _isInternalUpdate = true;
+  const idx = _cache.users.findIndex(u => u.id === user.id);
+  if (idx > -1) {
+    _cache.users[idx] = { ...user };
+  } else {
+    _cache.users.push({ ...user });
+  }
   
-  // Sync session if applicable
-  const session = getActiveUser();
-  if (session?.id === user.id) setActiveUser(user);
+  persist(KEYS.USERS, _cache.users);
   
+  // If we are saving the currently active user, update that pointer too
+  if (_cache.activeUser?.id === user.id) {
+    _cache.activeUser = { ...user };
+    persist(KEYS.ACTIVE_USER, user);
+  }
+  
+  _isInternalUpdate = false;
   notifyStorageChange();
 };
 
-/**
- * CRUD: JOBS
- */
-export const getJobs = (): Job[] => safeParse(KEYS.JOBS, []);
+export const getJobs = (): Job[] => _cache.jobs;
 
 export const saveJob = (job: Job) => {
-  const jobs = getJobs();
-  const idx = jobs.findIndex(j => j.id === job.id);
-  if (idx > -1) jobs[idx] = job;
-  else jobs.push(job);
-  localStorage.setItem(KEYS.JOBS, JSON.stringify(jobs));
+  _isInternalUpdate = true;
+  const idx = _cache.jobs.findIndex(j => j.id === job.id);
+  if (idx > -1) _cache.jobs[idx] = { ...job };
+  else _cache.jobs.push({ ...job });
+  
+  persist(KEYS.JOBS, _cache.jobs);
+  _isInternalUpdate = false;
   notifyStorageChange();
 };
 
-/**
- * SESSION MANAGEMENT
- */
-export const getActiveUser = (): UserProfile | null => safeParse(KEYS.ACTIVE_USER, null);
+export const getActiveUser = (): UserProfile | null => {
+  // Always verify cache against disk if possible for cross-tab sync
+  const rawActive = localStorage.getItem(KEYS.ACTIVE_USER);
+  if (rawActive) {
+    const parsed = JSON.parse(rawActive);
+    if (JSON.stringify(_cache.activeUser) !== rawActive) {
+      _cache.activeUser = parsed;
+    }
+  }
+  return _cache.activeUser;
+};
 
 export const setActiveUser = (user: UserProfile | null) => {
-  if (user) localStorage.setItem(KEYS.ACTIVE_USER, JSON.stringify(user));
-  else localStorage.removeItem(KEYS.ACTIVE_USER);
+  _isInternalUpdate = true;
+  _cache.activeUser = user ? { ...user } : null;
+  if (user) {
+    persist(KEYS.ACTIVE_USER, user);
+  } else {
+    localStorage.removeItem(KEYS.ACTIVE_USER);
+  }
+  _isInternalUpdate = false;
   notifyStorageChange();
 };
 
-/**
- * SYSTEM RESET
- */
 export const resetSystem = () => {
   localStorage.clear();
+  _cache.isLoaded = false;
   initializeStorage();
   window.location.reload();
 };

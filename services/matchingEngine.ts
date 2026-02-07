@@ -1,112 +1,101 @@
 
 import { Job, UserProfile, MatchResult, CandidateResult } from '../types';
-import { WEIGHTS, TREND_DATA, SKILL_ALIASES } from '../constants';
+import { WEIGHTS, TREND_INDEX, SKILL_ALIASES } from '../constants';
 
 /**
- * STAGE 1: PREPROCESSING (Normalization)
- * Converts user input/aliases into canonical skill IDs
+ * PREPROCESSING
  */
 export const normalizeSkills = (skills: string[]): string[] => {
-  return skills.map(s => {
-    const canonical = SKILL_ALIASES[s];
-    return canonical || s;
-  });
+  // Use a simple loop for maximum speed
+  const result = [];
+  for (let i = 0; i < skills.length; i++) {
+    result.push(SKILL_ALIASES[skills[i]] || skills[i]);
+  }
+  return result;
 };
 
 /**
- * STAGE 2: FEATURE ENGINEERING (Vectorization)
- * Skills are already IDs, but we ensure unique sets for calculation
- */
-const getSkillVector = (skills: string[]): Set<string> => new Set(skills);
-
-/**
- * STAGE 3: MATCHING & SCORING
+ * MATCHING & SCORING
  */
 
 // Skill Score: Binary Cosine Similarity
-export const calculateSkillScore = (seekerSkills: string[], jobSkills: string[]): number => {
-  if (jobSkills.length === 0) return 0;
-  if (seekerSkills.length === 0) return 0;
-  
-  const sSet = getSkillVector(seekerSkills);
-  const jSet = getSkillVector(jobSkills);
+// Memoization is handled by the caller to avoid garbage collection of Sets
+export const calculateSkillScore = (seekerSkills: Set<string>, jobSkills: string[]): number => {
+  if (jobSkills.length === 0 || seekerSkills.size === 0) return 0;
   
   let dotProduct = 0;
-  sSet.forEach(skillId => {
-    if (jSet.has(skillId)) dotProduct++;
-  });
+  for (let i = 0; i < jobSkills.length; i++) {
+    if (seekerSkills.has(jobSkills[i])) {
+      dotProduct++;
+    }
+  }
   
-  const magnitude = Math.sqrt(sSet.size) * Math.sqrt(jSet.size);
+  const magnitude = Math.sqrt(seekerSkills.size) * Math.sqrt(jobSkills.length);
   return dotProduct / magnitude;
 };
 
-// Location Score: Decision Tree logic for Nigeria
 export const calculateLocationScore = (seeker: UserProfile, job: Job): number => {
   if (job.isRemote) return 1.0;
   
   const sLoc = seeker.location;
   const jLoc = job.location;
   
-  // Same City (Perfect)
-  if (sLoc.city.toLowerCase() === jLoc.city.toLowerCase() && sLoc.state === jLoc.state) return 1.0;
-  
-  // Same State
   if (sLoc.state === jLoc.state) {
-    // Relocation preference boosts same-state cross-city matches
+    if (sLoc.city.toLowerCase() === jLoc.city.toLowerCase()) return 1.0;
     return seeker.relocatePreference ? 0.7 : 0.4;
   }
   
-  // Different State
   return seeker.relocatePreference ? 0.2 : 0.05;
 };
 
-// Trend Score: Industry-based adjustment
 export const calculateTrendScore = (industry: string): number => {
-  const trend = TREND_DATA.find(t => t.industry === industry);
-  // Default to 0.4 (neutral/low) if industry is unrecognized
-  return trend ? trend.trendScore : 0.4;
+  // TREND_INDEX is a Map: O(1) lookup
+  return TREND_INDEX.get(industry) || 0.4;
 };
 
 /**
- * STAGE 4: RANKING & PRUNING
- * Efficiently computes matches for a seeker across all jobs
+ * RANKING ENGINE
  */
 export const getRecommendations = (seeker: UserProfile, allJobs: Job[]): MatchResult[] => {
-  // 1. Candidate Pruning (Scalability)
-  // We only score jobs that match the industry or are remote
-  // In a real prod app, this would be a DB query with indexes
-  const prunedJobs = allJobs.filter(job => {
-    const industryMatch = seeker.skills.length === 0 || job.industry === 'Technology'; // Simplified for demo
-    const locationViable = job.isRemote || job.location.state === seeker.location.state || seeker.relocatePreference;
-    return job.status === 'OPEN' && locationViable;
-  });
+  const seekerSkillSet = new Set(seeker.skills);
+  const results: MatchResult[] = [];
 
-  // 2. Full Pipeline Scoring
-  return prunedJobs.map(job => {
-    const scoreSkill = calculateSkillScore(seeker.skills, job.requiredSkills);
+  for (let i = 0; i < allJobs.length; i++) {
+    const job = allJobs[i];
+    
+    // 1. FAST PRUNING (Early Exit)
+    if (job.status !== 'OPEN') continue;
+    
+    const isRemote = job.isRemote;
+    const isSameState = job.location.state === seeker.location.state;
+    
+    if (!isRemote && !isSameState && !seeker.relocatePreference) continue;
+
+    // 2. HEAVY MATH (Only for pruned subset)
+    const scoreSkill = calculateSkillScore(seekerSkillSet, job.requiredSkills);
     const scoreLocation = calculateLocationScore(seeker, job);
     const scoreTrend = calculateTrendScore(job.industry);
     
-    // Final Weighted Score
     const scoreFinal = (WEIGHTS.SKILL * scoreSkill) + 
                        (WEIGHTS.LOCATION * scoreLocation) + 
                        (WEIGHTS.TREND * scoreTrend);
     
-    return {
+    results.push({
       job,
       scoreSkill,
       scoreLocation,
       scoreTrend,
       scoreFinal: Math.round(scoreFinal * 100) / 100
-    };
-  }).sort((a, b) => b.scoreFinal - a.scoreFinal); // 3. Ranking
+    });
+  }
+
+  // 3. SORT (Ranked)
+  return results.sort((a, b) => b.scoreFinal - a.scoreFinal);
 };
 
-/**
- * Single Match Wrapper (Legacy compatibility)
- */
 export const computeMatch = (seeker: UserProfile, job: Job): MatchResult => {
-  const scoreSkill = calculateSkillScore(seeker.skills, job.requiredSkills);
+  const seekerSkillSet = new Set(seeker.skills);
+  const scoreSkill = calculateSkillScore(seekerSkillSet, job.requiredSkills);
   const scoreLocation = calculateLocationScore(seeker, job);
   const scoreTrend = calculateTrendScore(job.industry);
   const scoreFinal = (WEIGHTS.SKILL * scoreSkill) + (WEIGHTS.LOCATION * scoreLocation) + (WEIGHTS.TREND * scoreTrend);
@@ -120,11 +109,9 @@ export const computeMatch = (seeker: UserProfile, job: Job): MatchResult => {
   };
 };
 
-/**
- * Candidate Match Wrapper (Used by employers to find talent)
- */
 export const computeCandidateMatch = (job: Job, seeker: UserProfile): CandidateResult => {
-  const scoreSkill = calculateSkillScore(seeker.skills, job.requiredSkills);
+  const seekerSkillSet = new Set(seeker.skills);
+  const scoreSkill = calculateSkillScore(seekerSkillSet, job.requiredSkills);
   const scoreLocation = calculateLocationScore(seeker, job);
   const scoreTrend = calculateTrendScore(job.industry);
   const scoreFinal = (WEIGHTS.SKILL * scoreSkill) + (WEIGHTS.LOCATION * scoreLocation) + (WEIGHTS.TREND * scoreTrend);

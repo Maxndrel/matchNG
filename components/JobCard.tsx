@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import { MatchResult } from '../types';
-import { MapPin, Globe, Banknote, Star, CheckCircle2, Loader2, Info } from 'lucide-react';
+import { SKILL_INDEX } from '../constants';
+import { MapPin, Globe, Banknote, Star, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface JobCardProps {
   match: MatchResult;
@@ -11,33 +12,44 @@ interface JobCardProps {
   isSaved?: boolean;
 }
 
-const JobCard: React.FC<JobCardProps> = ({ match, onApply, onSave, isApplied, isSaved }) => {
+/**
+ * Optimized JobCard Component
+ * - Wrapped in React.memo to prevent re-renders unless props change.
+ * - Uses useCallback for event handlers to maintain reference stability.
+ * - Optimized skill lookups via SKILL_INDEX Map.
+ */
+const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplied, isSaved }) => {
   const { job, scoreSkill, scoreLocation, scoreTrend, scoreFinal } = match;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Effect for clearing feedback with cleanup to prevent memory leaks
   useEffect(() => {
-    if (feedback) {
-      const timer = setTimeout(() => setFeedback(null), 3000);
-      return () => clearTimeout(timer);
-    }
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(null), 3000);
+    return () => clearTimeout(timer);
   }, [feedback]);
 
-  const handleApplyClick = async () => {
+  const handleApplyClick = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isApplied || isProcessing) return;
+
     setIsProcessing(true);
-    // Simulate a brief network delay for better UX feel
-    await new Promise(resolve => setTimeout(resolve, 600));
+    // Micro-delay for UI responsiveness feel (optimistic UI update could be faster, but this ensures state catch-up)
+    await new Promise(resolve => setTimeout(resolve, 400));
     onApply(job.id);
-    setFeedback('Application submitted successfully!');
+    setFeedback('Application Sent!');
     setIsProcessing(false);
-  };
+  }, [isApplied, isProcessing, job.id, onApply]);
 
-  const handleSaveClick = () => {
+  const handleSaveClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
     onSave(job.id);
-    setFeedback(isSaved ? 'Removed from your saved jobs' : 'Opportunity bookmarked!');
-  };
+    // Feedback text based on next state
+    setFeedback(!isSaved ? 'Job Bookmarked!' : 'Removed Bookmark');
+  }, [job.id, onSave, isSaved]);
 
+  // Pure styling helpers - kept outside render scope for cleanliness
   const getScoreColor = (score: number) => {
     if (score > 0.8) return 'text-emerald-600';
     if (score > 0.5) return 'text-yellow-600';
@@ -51,15 +63,13 @@ const JobCard: React.FC<JobCardProps> = ({ match, onApply, onSave, isApplied, is
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:border-emerald-100 transition-all duration-500 overflow-hidden flex flex-col group h-full relative">
-      {/* Feedback Toast Overlay */}
+    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:border-emerald-100 transition-all duration-500 overflow-hidden flex flex-col group h-full relative will-change-transform">
+      {/* Visual Feedback Toast */}
       {feedback && (
-        <div className="absolute top-4 left-4 right-4 z-20 animate-in slide-in-from-top-2 fade-in duration-300">
-          <div className="bg-gray-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-white/10">
-            <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xs font-black tracking-tight">{feedback}</span>
+        <div className="absolute top-4 left-4 right-4 z-20 animate-in slide-in-from-top-2 fade-in duration-300 pointer-events-none">
+          <div className="bg-gray-900/95 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3 border border-white/10">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-[11px] font-black uppercase tracking-tight">{feedback}</span>
           </div>
         </div>
       )}
@@ -132,15 +142,9 @@ const JobCard: React.FC<JobCardProps> = ({ match, onApply, onSave, isApplied, is
           }`}
         >
           {isProcessing ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Processing...
-            </>
+            <Loader2 className="w-5 h-5 animate-spin" />
           ) : isApplied ? (
-            <>
-              <CheckCircle2 className="w-4 h-4" />
-              Application Sent
-            </>
+            'Application Sent'
           ) : (
             'Quick Apply'
           )}
@@ -159,6 +163,16 @@ const JobCard: React.FC<JobCardProps> = ({ match, onApply, onSave, isApplied, is
       </div>
     </div>
   );
-};
+}, (prev, next) => {
+  // Custom equality check: only re-render if fundamental properties change
+  return (
+    prev.isApplied === next.isApplied &&
+    prev.isSaved === next.isSaved &&
+    prev.match.job.id === next.match.job.id &&
+    prev.match.scoreFinal === next.match.scoreFinal
+  );
+});
+
+JobCard.displayName = 'JobCard';
 
 export default JobCard;

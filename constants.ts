@@ -23,6 +23,9 @@ export const TREND_DATA: IndustryTrend[] = [
   { industry: 'Banking', growthRate: 0.08, avgSkillDemand: 0.7, trendScore: 0.65 }
 ];
 
+// O(1) Lookup Index for Trends
+export const TREND_INDEX = new Map(TREND_DATA.map(t => [t.industry, t.trendScore]));
+
 export const SKILL_TAXONOMY: Skill[] = [
   { id: '1', name: 'React.js', category: 'Tech' },
   { id: '2', name: 'Python', category: 'Tech' },
@@ -35,6 +38,9 @@ export const SKILL_TAXONOMY: Skill[] = [
   { id: '9', name: 'Graphic Design', category: 'Creative' },
   { id: '10', name: 'Customer Service', category: 'Soft' }
 ];
+
+// O(1) Lookup Index for Skills
+export const SKILL_INDEX = new Map(SKILL_TAXONOMY.map(s => [s.id, s]));
 
 export const SKILL_ALIASES: Record<string, string> = {
   'JS': 'React.js',
