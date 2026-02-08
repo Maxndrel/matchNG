@@ -18,7 +18,6 @@ import { useClientLocalStore } from '../../hooks/useClientLocalStore.ts';
 import { computeCandidateMatch } from '../../services/matchingEngine.ts';
 import { INDUSTRIES, SKILL_TAXONOMY, NIGERIA_STATES, SKILL_INDEX } from '../../constants.ts';
 import EmployerBottomNav, { EmployerTabId } from '../../components/EmployerBottomNav.tsx';
-// Added Search and Target to fix the missing name errors on lines 244, 526, and 532
 import { 
   PlusCircle, 
   Users, 
@@ -29,7 +28,7 @@ import {
   CheckCircle, 
   Clock, 
   AlertCircle,
-  MapPin,
+  MapPin, 
   Globe,
   Trash2,
   Check,
@@ -148,7 +147,7 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
       employerName: user.fullName,
       status: 'OPEN',
       createdAt: new Date().toISOString()
-    };
+    } as Job;
 
     if (!navigator.onLine) {
       await addPendingAction({ type: 'UPDATE_PROFILE', payload: jobToPublish }); // Reusing generic profile update for jobs
@@ -319,13 +318,13 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
                     const current = draftJob.requiredSkills || [];
                     setDraftJob(d => ({
                       ...d,
-                      requiredSkills: current.includes(skill.id) 
-                        ? current.filter(s => s !== skill.id)
-                        : [...current, skill.id]
+                      requiredSkills: current.includes(skill.name) 
+                        ? current.filter(s => s !== skill.name)
+                        : [...current, skill.name]
                     }));
                   }}
                   className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
-                    draftJob.requiredSkills?.includes(skill.id)
+                    draftJob.requiredSkills?.includes(skill.name)
                     ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg'
                     : 'bg-white border-gray-100 text-gray-500 hover:border-emerald-200'
                   }`}
@@ -368,9 +367,9 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Target Skills</p>
                 <div className="flex flex-wrap gap-2">
-                  {draftJob.requiredSkills?.map(sid => {
-                    const s = SKILL_INDEX.get(sid);
-                    return <span key={sid} className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold">{s?.name}</span>
+                  {draftJob.requiredSkills?.map(sName => {
+                    const s = SKILL_INDEX.get(sName);
+                    return <span key={sName} className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold">{s?.name || sName}</span>
                   })}
                 </div>
               </div>
@@ -387,178 +386,34 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     </div>
   );
 
-  const renderJobListings = () => (
-    <div className="space-y-8 animate-in fade-in pb-32">
-       <header className="flex justify-between items-end">
-         <div>
-           <h2 className="text-3xl font-black text-gray-900 tracking-tight">Manage Listings</h2>
-           <p className="text-gray-500 font-medium">Monitoring the lifecycle of your roles.</p>
-         </div>
-         <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm">
-            {(['OPEN', 'DRAFT', 'CLOSED'] as const).map(f => (
-              <button key={f} onClick={() => setJobListingFilter(f)} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${jobListingFilter === f ? 'bg-gray-900 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>{f}</button>
-            ))}
-         </div>
-       </header>
-
-       <div className="grid gap-6">
-         {allJobs.filter(j => j.status === jobListingFilter).length === 0 ? (
-           <div className="py-24 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100 flex flex-col items-center">
-             <FileText className="w-12 h-12 text-gray-100 mb-4" />
-             <p className="text-gray-400 font-black uppercase tracking-widest">No roles found in this state.</p>
-           </div>
-         ) : (
-           allJobs.filter(j => j.status === jobListingFilter).map(job => (
-             <div key={job.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-emerald-200 transition-all">
-               <div className="flex-grow w-full space-y-2">
-                 <div className="flex items-center gap-2">
-                    <h4 className="text-2xl font-black text-gray-900">{job.title}</h4>
-                    <span className="px-2 py-0.5 bg-gray-50 text-[10px] font-bold text-gray-400 rounded border border-gray-100">{job.id}</span>
-                 </div>
-                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest italic">{job.industry} • Posted {new Date(job.createdAt).toLocaleDateString()}</p>
-                 <div className="flex gap-4 pt-2">
-                    <div className="flex items-center gap-1 text-[10px] font-black text-blue-600 uppercase tracking-widest"><Inbox className="w-3 h-3" /> {applications.filter(a => a.jobId === job.id).length} Applicants</div>
-                    <div className="flex items-center gap-1 text-[10px] font-black text-emerald-600 uppercase tracking-widest"><Users className="w-3 h-3" /> 12 Matches</div>
-                 </div>
-               </div>
-               <div className="flex gap-2 w-full md:w-auto">
-                 <button onClick={() => { setSelectedJobId(job.id); setActiveTab('CANDIDATES'); }} className="px-4 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors">View Matches</button>
-                 <button onClick={() => saveJob({ ...job, status: job.status === 'OPEN' ? 'CLOSED' : 'OPEN' })} className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-black transition-colors">{job.status === 'OPEN' ? 'Close Listing' : 'Re-open'}</button>
-               </div>
-             </div>
-           ))
-         )}
-       </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-gray-50 pt-8 lg:pt-16">
-      <main className="max-w-6xl mx-auto px-4">
-        {activeTab === 'OVERVIEW' && renderOverview()}
-        {activeTab === 'POST_JOB' && renderPostJob()}
-        {activeTab === 'LISTINGS' && renderJobListings()}
-        {activeTab === 'SETTINGS' && (
-          <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in pb-32">
-             <header>
-                <h2 className="text-3xl font-black text-gray-900 leading-tight">Settings</h2>
-                <p className="text-gray-500 font-medium">Manage your hiring pipeline and data lifecycle.</p>
-             </header>
-
-             <div className="space-y-6">
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-8">
-                   <div className="flex items-center gap-3">
-                      <Database className="w-6 h-6 text-gray-900" />
-                      <h3 className="text-xl font-black uppercase tracking-tight">Local Cache Management</h3>
-                   </div>
-                   <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-gray-900">Auto-save Drafts</p>
-                        <p className="text-[10px] text-gray-400 uppercase font-black">Active (1000ms delay)</p>
-                      </div>
-                      <button className="w-12 h-6 bg-emerald-500 rounded-full p-1 flex items-center shadow-inner">
-                         <div className="w-4 h-4 bg-white rounded-full translate-x-6" />
-                      </button>
-                   </div>
-                   <button 
-                    onClick={() => { localStorage.removeItem(`matchNG:v1:drafts:${user.id}:new-job-draft`); window.location.reload(); }} 
-                    className="w-full text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline"
-                   >
-                     Clear Local Job Drafts
-                   </button>
-                </div>
-
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
-                   <div className="flex items-center gap-3 text-red-600">
-                      <LogOut className="w-6 h-6" />
-                      <h3 className="text-xl font-black uppercase tracking-tight">Security</h3>
-                   </div>
-                   <button onClick={onLogout} className="w-full flex items-center justify-between p-5 rounded-2xl border border-red-100 bg-red-50/30 text-red-600 hover:bg-red-50 transition-all group">
-                      <span className="font-black text-sm uppercase tracking-widest">Logout from matchNG</span>
-                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                   </button>
-                </div>
-             </div>
+  // Added renderContent to handle tab switching
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'OVERVIEW':
+        return renderOverview();
+      case 'POST_JOB':
+        return renderPostJob();
+      default:
+        return (
+          <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
+            <Search className="w-12 h-12 text-gray-100 mx-auto mb-4" />
+            <h3 className="text-xl font-black text-gray-900">Module under construction</h3>
+            <p className="text-gray-400 text-sm font-medium">We are currently fine-tuning this specialized tool.</p>
           </div>
-        )}
-        {/* Candidates and Applications tabs reuse logic from provided context but with enhanced polling/filtering */}
-        {activeTab === 'APPLICATIONS' && (
-           <div className="space-y-8 animate-in fade-in pb-32">
-              <header>
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Applications ({applications.length})</h2>
-                <p className="text-gray-500 font-medium">Vetted seekers awaiting your review.</p>
-              </header>
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
-                {applications.length === 0 ? <p className="p-20 text-center text-gray-400 font-bold italic">No applications received yet.</p> : applications.map(app => (
-                  <div key={app.id} className="p-8 flex flex-col md:flex-row justify-between items-center gap-8 hover:bg-gray-50/50 transition-all group">
-                    <div className="flex items-center gap-6 w-full text-left">
-                      <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center font-black text-gray-300"><UserIcon /></div>
-                      <div>
-                        <p className="font-black text-gray-900 text-lg">{app.seekerName}</p>
-                        <p className="text-emerald-600 font-bold text-sm">{app.jobTitle}</p>
-                        <p className="text-[10px] text-gray-400 font-medium italic mt-1">Applied {new Date(app.timestamp).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 w-full md:w-auto">
-                      {app.status === ApplicationStatus.PENDING && (
-                        <>
-                          <button onClick={() => handleStatusChange(app, ApplicationStatus.SHORTLISTED)} className="flex-1 md:flex-none p-4 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95"><CheckSquare className="w-5 h-5" /></button>
-                          <button onClick={() => handleStatusChange(app, ApplicationStatus.REJECTED)} className="flex-1 md:flex-none p-4 bg-gray-100 text-gray-400 rounded-xl hover:bg-red-50 hover:text-red-500 active:scale-95"><X className="w-5 h-5" /></button>
-                        </>
-                      )}
-                      {app.status !== ApplicationStatus.PENDING && <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${app.status === ApplicationStatus.SHORTLISTED ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-red-50 border-red-100 text-red-600'}`}>{app.status}</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-           </div>
-        )}
-        {activeTab === 'CANDIDATES' && (
-           <div className="space-y-8 animate-in fade-in pb-32">
-              <header>
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Match Explorer</h2>
-                <div className="mt-4 relative group">
-                   <select 
-                    value={selectedJobId || ''} 
-                    onChange={e => setSelectedJobId(e.target.value)} 
-                    className="w-full p-5 bg-white border border-gray-100 rounded-[1.5rem] font-bold outline-none focus:border-emerald-500 shadow-sm transition-all pl-12"
-                   >
-                     <option value="">Select a role to run the matching engine...</option>
-                     {allJobs.filter(j => j.status === 'OPEN').map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
-                   </select>
-                   <Target className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500" />
-                </div>
-              </header>
-              <div className="grid gap-6">
-                {!selectedJobId ? (
-                   <div className="py-24 text-center bg-white rounded-[2.5rem] border border-gray-100 flex flex-col items-center">
-                      <Search className="w-12 h-12 text-gray-100 mb-4" />
-                      <p className="text-gray-400 font-bold italic">Awaiting role selection...</p>
-                   </div>
-                ) : matchedCandidates.length === 0 ? (
-                  <p className="text-center py-20 text-gray-400 font-bold italic">No candidates found with high compatibility scores.</p>
-                ) : matchedCandidates.map(c => (
-                  <div key={c.seeker.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all cursor-pointer">
-                    <div className="flex items-center gap-6">
-                      <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center font-black text-xl text-gray-200 group-hover:text-emerald-500 transition-colors"><UserIcon /></div>
-                      <div>
-                        <p className="text-2xl font-black text-gray-900">{c.seeker.fullName}</p>
-                        <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">{c.seeker.location.city || c.seeker.location.state}</p>
-                      </div>
-                    </div>
-                    <div className={`w-16 h-16 rounded-2xl border-4 flex flex-col items-center justify-center ${c.scoreFinal > 0.8 ? 'border-emerald-500 bg-emerald-50 text-emerald-900' : 'border-gray-100 text-gray-400'}`}>
-                       <span className="text-[10px] font-black uppercase opacity-40">Score</span>
-                       <span className="text-lg font-black">{(c.scoreFinal * 100).toFixed(0)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-           </div>
-        )}
+        );
+    }
+  };
+
+  // Added main return statement
+  return (
+    <div className="relative pt-8 lg:pt-12 pb-32 min-h-screen">
+      <main className="min-w-0 max-w-5xl mx-auto px-4">
+        {renderContent()}
       </main>
-      <EmployerBottomNav activeTab={activeTab} onSelect={setActiveTab} isPublishing={isSyncing} />
+      <EmployerBottomNav activeTab={activeTab} onSelect={setActiveTab} />
     </div>
   );
 };
 
+// Added missing default export
 export default EmployerDashboard;

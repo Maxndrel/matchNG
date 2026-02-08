@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -9,18 +10,21 @@ interface LayoutProps {
   userName?: string;
   onLogout?: () => void;
   onNavigate?: (page: any) => void;
+  hideNav?: boolean;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, userRole, userName, onLogout, onNavigate }) => {
+const Layout: React.FC<LayoutProps> = ({ children, userRole, userName, onLogout, onNavigate, hideNav }) => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <Navbar 
-        role={userRole} 
-        userName={userName}
-        onLogout={onLogout} 
-        onNavigate={onNavigate} 
-      />
-      <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
+      {!hideNav && (
+        <Navbar 
+          role={userRole} 
+          userName={userName}
+          onLogout={onLogout} 
+          onNavigate={onNavigate} 
+        />
+      )}
+      <main className={`flex-grow container mx-auto max-w-6xl ${hideNav ? 'p-0' : 'px-4 py-8'}`}>
         {children}
       </main>
     </div>

@@ -50,6 +50,8 @@ export interface UserProfile {
   fullName: string;
   role: UserRole;
   skills: string[];
+  primaryIndustry?: string;
+  primarySkill?: string;
   location: Location;
   remotePreference: boolean;
   relocatePreference: boolean;

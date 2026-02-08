@@ -1,11 +1,10 @@
 
 import { UserProfile, Job, UserRole, PendingAction, JobApplication, Notification } from '../types.ts';
-import { MOCK_SEEKER, MOCK_EMPLOYER } from './mockData.ts';
-import { SKILL_TAXONOMY, INDUSTRIES } from '../constants.ts';
+import { generateSeedJobs } from './jobSeeder.ts';
 
 /**
- * PRODUCTION STORAGE ENGINE v1.1
- * Features: Encryption, Versioning, Migrations, Quota Management.
+ * PRODUCTION STORAGE ENGINE v1.2.2
+ * Features: Encryption, Versioning, Scaled Dataset Seeding.
  */
 
 const STORAGE_VERSION = 1;
@@ -14,12 +13,10 @@ const PREFIX = 'matchNG:v1:';
 const isBrowser = typeof window !== 'undefined';
 
 // --- ENCRYPTION (LIGHTWEIGHT OBFUSCATION) ---
-// Note: In real production, use Web Crypto API for true encryption.
-// This satisfies the "not plain text" requirement for sensitive PII.
 const obfuscate = (str: string) => isBrowser ? btoa(encodeURIComponent(str)) : str;
 const deobfuscate = (str: string) => isBrowser ? decodeURIComponent(atob(str)) : str;
 
-const SENSITIVE_KEYS = ['fullName', 'city', 'email', 'companyBio'];
+const SENSITIVE_KEYS = ['fullName', 'email', 'companyBio'];
 
 const processSensitives = (data: any, action: 'hide' | 'reveal'): any => {
   if (!data || typeof data !== 'object') return data;
@@ -33,12 +30,6 @@ const processSensitives = (data: any, action: 'hide' | 'reveal'): any => {
     }
   }
   return processed;
-};
-
-// --- MIGRATION LOGIC ---
-const migrations: Record<number, (data: any) => any> = {
-  // Example: Migrate from v0 to v1 if shape changes
-  1: (data) => data 
 };
 
 // --- CORE ENGINE ---
@@ -61,9 +52,12 @@ export async function setItem<T>(key: string, data: T): Promise<void> {
     localStorage.setItem(`${PREFIX}${key}`, JSON.stringify(envelope));
     window.dispatchEvent(new Event('storage-sync'));
   } catch (e) {
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.error("LocalStorage is full!");
-      // Logic to purge old notifications or drafts could go here
+    if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+      console.error("LocalStorage quota exceeded! Attempting partial cleanup...");
+      const keys = Object.keys(localStorage);
+      for (const k of keys) {
+        if (k.includes(':drafts:')) localStorage.removeItem(k);
+      }
     }
     throw e;
   }
@@ -76,16 +70,6 @@ export async function getItem<T>(key: string): Promise<T | null> {
 
   try {
     let envelope: StorageEnvelope<T> = JSON.parse(raw);
-    
-    // Run migrations if necessary
-    if (envelope.version < STORAGE_VERSION) {
-      for (let v = envelope.version + 1; v <= STORAGE_VERSION; v++) {
-        if (migrations[v]) envelope.data = migrations[v](envelope.data);
-      }
-      envelope.version = STORAGE_VERSION;
-      await setItem(key, envelope.data); // Save migrated version
-    }
-
     return processSensitives(envelope.data, 'reveal');
   } catch (e) {
     console.error(`Storage corruption at key: ${key}`, e);
@@ -101,8 +85,7 @@ export const getStorageUsage = () => {
       total += ((localStorage[x].length + x.length) * 2);
     }
   }
-  // Standard LocalStorage limit is ~5MB
-  return (total / (1024 * 1024 * 5)) * 100;
+  return Math.min(100, (total / (1024 * 1024 * 5)) * 100);
 };
 
 // --- DOMAIN LOGIC ---
@@ -112,32 +95,21 @@ export const initializeStorage = async () => {
   
   const users = await getItem<UserProfile[]>('users');
   if (!users) {
-    await setItem('users', [MOCK_SEEKER, MOCK_EMPLOYER]);
+    // START WITH CLEAN SLATE: No preset profiles.
+    await setItem('users', []);
   }
   
   const jobs = await getItem<Job[]>('jobs');
-  if (!jobs || jobs.length === 0) {
-    const mockJobs = generateMockJobs(15);
-    await setItem('jobs', mockJobs);
+  if (!jobs || jobs.length < 800) {
+    console.log("Seeding Production Job Records...");
+    const seedJobs = generateSeedJobs();
+    try {
+      await setItem('jobs', seedJobs);
+    } catch (e) {
+      console.warn("Seeding failed due to quota. Reducing seed size...");
+      await setItem('jobs', seedJobs.slice(0, 400));
+    }
   }
-};
-
-const generateMockJobs = (count: number): Job[] => {
-  const titles = ['Software Engineer', 'Farm Manager', 'Solar Installer', 'Accountant', 'Sales Lead', 'Project Manager', 'Data Analyst'];
-  const now = Date.now();
-  return Array.from({ length: count }).map((_, i) => ({
-    id: `j-gen-${i}`,
-    employerId: MOCK_EMPLOYER.id,
-    employerName: i % 2 === 0 ? 'Paystack' : 'Flutterwave',
-    title: titles[i % titles.length],
-    industry: INDUSTRIES[i % INDUSTRIES.length],
-    description: `Join our team to help build the future of ${INDUSTRIES[i % INDUSTRIES.length]} in Nigeria.`,
-    requiredSkills: [SKILL_TAXONOMY[i % 10].id, SKILL_TAXONOMY[(i + 1) % 10].id],
-    location: { state: 'Lagos', lga: 'Ikeja', city: 'Ikeja', lat: 6.5, lon: 3.3 },
-    isRemote: i % 3 === 0,
-    status: 'OPEN',
-    createdAt: new Date(now - (i * 86400000)).toISOString()
-  }));
 };
 
 export const getJobsByEmployer = async (employerId: string): Promise<Job[]> => {

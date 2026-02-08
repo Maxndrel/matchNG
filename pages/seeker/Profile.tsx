@@ -1,304 +1,404 @@
 
-import React, { useState, useMemo } from 'react';
-import { UserProfile, Education, Experience } from '../../types';
-import { SKILL_TAXONOMY, NIGERIA_STATES } from '../../constants';
+"use client";
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { UserProfile, Education, Experience } from '../../types.ts';
+import { ONBOARDING_MAP, NIGERIA_STATES } from '../../constants.ts';
+import { 
+  User, 
+  MapPin, 
+  Briefcase, 
+  GraduationCap, 
+  CheckCircle2, 
+  AlertCircle, 
+  ChevronRight, 
+  Save, 
+  Plus, 
+  Trash2,
+  Target
+} from 'lucide-react';
 
 interface ProfileProps {
   user: UserProfile;
   onUpdate: (updated: UserProfile) => void;
-  isCompletingProfile?: boolean;
 }
 
-const Profile: React.FC<ProfileProps> = ({ user, onUpdate, isCompletingProfile }) => {
-  const [skills, setSkills] = useState<string[]>(user.skills);
-  const [state, setState] = useState(user.location.state);
-  const [city, setCity] = useState(user.location.city);
-  const [education, setEducation] = useState<Education[]>(user.education || []);
-  const [experience, setExperience] = useState<Experience[]>(user.experience || []);
-  const [skillSearch, setSkillSearch] = useState('');
-  
-  const toggleSkill = (id: string) => {
-    setSkills(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+const Profile: React.FC<ProfileProps> = ({ user, onUpdate }) => {
+  // Local state for form management
+  const [formData, setFormData] = useState({
+    fullName: user.fullName,
+    primaryIndustry: user.primaryIndustry || '',
+    primarySkill: user.primarySkill || '',
+    state: user.location.state,
+    city: user.location.city,
+    education: user.education || [],
+    experience: user.experience || []
+  });
+
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Derived data
+  const industries = Object.keys(ONBOARDING_MAP);
+  const availableSkills = formData.primaryIndustry 
+    ? ONBOARDING_MAP[formData.primaryIndustry].skills 
+    : [];
+
+  // Check if form is "dirty" (has changes)
+  const isDirty = useMemo(() => {
+    return (
+      formData.fullName !== user.fullName ||
+      formData.primaryIndustry !== user.primaryIndustry ||
+      formData.primarySkill !== user.primarySkill ||
+      formData.state !== user.location.state ||
+      formData.city !== user.location.city ||
+      JSON.stringify(formData.education) !== JSON.stringify(user.education || []) ||
+      JSON.stringify(formData.experience) !== JSON.stringify(user.experience || [])
+    );
+  }, [formData, user]);
+
+  // Handlers
+  const handleIndustryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newIndustry = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      primaryIndustry: newIndustry,
+      primarySkill: '' // Reset skill when industry changes to maintain consistency
+    }));
   };
 
-  const filteredSkills = useMemo(() => {
-    return SKILL_TAXONOMY.filter(s => 
-      s.name.toLowerCase().includes(skillSearch.toLowerCase()) || 
-      s.category.toLowerCase().includes(skillSearch.toLowerCase())
-    );
-  }, [skillSearch]);
-
-  const handleSave = () => {
-    if (skills.length === 0) {
-      alert('Please select at least one skill to get job matches.');
-      return;
-    }
-    if (city.trim() === '') {
-      alert('Please enter your current city.');
+  const handleSave = async () => {
+    if (!formData.primaryIndustry || !formData.primarySkill || !formData.city) {
+      alert("Please complete your Industry, Primary Skill, and City.");
       return;
     }
 
-    onUpdate({
+    setIsSaving(true);
+    
+    const updatedUser: UserProfile = {
       ...user,
-      skills,
-      location: { ...user.location, state, city },
-      education,
-      experience
-    });
-    alert('Profile updated! We are now re-computing your best job matches.');
+      fullName: formData.fullName,
+      primaryIndustry: formData.primaryIndustry,
+      primarySkill: formData.primarySkill,
+      skills: Array.from(new Set([...user.skills, formData.primarySkill])), // Add to search index
+      location: {
+        ...user.location,
+        state: formData.state,
+        city: formData.city
+      },
+      education: formData.education,
+      experience: formData.experience
+    };
+
+    // Simulate network delay for UX
+    await new Promise(r => setTimeout(r, 600));
+    
+    onUpdate(updatedUser);
+    setIsSaving(false);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
   };
 
   const addEducation = () => {
-    setEducation([...education, { institution: '', degree: '', year: '' }]);
+    setFormData(prev => ({
+      ...prev,
+      education: [...prev.education, { institution: '', degree: '', year: '' }]
+    }));
   };
 
   const addExperience = () => {
-    setExperience([...experience, { company: '', role: '', duration: '' }]);
-  };
-
-  const removeEducation = (index: number) => {
-    setEducation(education.filter((_, i) => i !== index));
-  };
-
-  const removeExperience = (index: number) => {
-    setExperience(experience.filter((_, i) => i !== index));
+    setFormData(prev => ({
+      ...prev,
+      experience: [...prev.experience, { company: '', role: '', duration: '' }]
+    }));
   };
 
   return (
-    <div className="fade-in max-w-2xl mx-auto space-y-12 pb-24">
-      {isCompletingProfile && (
-        <div className="bg-emerald-50 border-2 border-emerald-100 p-8 rounded-[2.5rem] flex items-start gap-6 animate-in slide-in-from-top-4 duration-500">
-          <div className="w-14 h-14 bg-emerald-600 rounded-3xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-200">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="font-black text-emerald-900 text-xl">Power Up Your Matching</h3>
-            <p className="text-emerald-700/80 text-sm mt-1 leading-relaxed">
-              Complete your profile to unlock high-accuracy job matches. Our algorithm weights your <strong>skills</strong> and <strong>location</strong> above all else.
-            </p>
+    <div className="max-w-3xl mx-auto space-y-10 pb-32 animate-in fade-in duration-500">
+      
+      {/* Success Notification */}
+      {showSuccess && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4 pointer-events-none">
+          <div className="bg-emerald-600 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3 border border-emerald-500 animate-in slide-in-from-top-8 duration-300">
+            <CheckCircle2 className="w-5 h-5" />
+            <p className="text-xs font-black uppercase tracking-widest">Profile Synced Successfully</p>
           </div>
         </div>
       )}
 
       <header className="space-y-2">
-        <h1 className="text-4xl font-black text-gray-900 tracking-tight">Professional Profile</h1>
-        <p className="text-gray-500 font-medium">This data drives your matchNG algorithm score.</p>
+        <h1 className="text-4xl font-black text-gray-900 tracking-tight">Profile Settings</h1>
+        <p className="text-gray-500 font-medium">Manage your metadata to improve career match accuracy.</p>
       </header>
 
-      {/* 1. LOCATION */}
-      <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
-        <div className="flex items-center gap-3">
-          <span className="w-10 h-10 bg-gray-900 text-white rounded-2xl flex items-center justify-center font-black">01</span>
-          <h3 className="text-xl font-black text-gray-900">Where are you based?</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current State</label>
-            <select 
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-              className="w-full p-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 transition outline-none font-bold"
-            >
-              {NIGERIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+      {/* SECTION 1: SECTOR & EXPERTISE */}
+      <section className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-8 md:p-10 space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+              <Target className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-gray-900">Sector & Expertise</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Primary Career Path</p>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">City / LGA</label>
-            <input 
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Yaba, Ikeja, Garki"
-              className="w-full p-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 transition outline-none font-bold"
-            />
-          </div>
-        </div>
-      </section>
 
-      {/* 2. SKILLS */}
-      <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 bg-gray-900 text-white rounded-2xl flex items-center justify-center font-black">02</span>
-            <h3 className="text-xl font-black text-gray-900">What are your skills?</h3>
-          </div>
-          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{skills.length} Selected</span>
-        </div>
-        
-        <div className="relative mb-6">
-          <input 
-            type="text" 
-            placeholder="Search skills (e.g. React, Repair, Farming...)" 
-            value={skillSearch}
-            onChange={e => setSkillSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 transition outline-none font-bold text-sm"
-          />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-        </div>
-
-        <div className="flex flex-wrap gap-2.5 max-h-64 overflow-y-auto pr-2 no-scrollbar">
-          {filteredSkills.map(skill => (
-            <button
-              key={skill.id}
-              onClick={() => toggleSkill(skill.id)}
-              className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border ${
-                skills.includes(skill.id) 
-                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100 scale-[1.02]' 
-                  : 'bg-white border-gray-100 text-gray-500 hover:border-emerald-200'
-              }`}
-            >
-              {skill.name}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* 3. EDUCATION */}
-      <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 bg-gray-900 text-white rounded-2xl flex items-center justify-center font-black">03</span>
-            <h3 className="text-xl font-black text-gray-900">Education</h3>
-          </div>
-          <button onClick={addEducation} className="text-xs font-black uppercase tracking-widest text-emerald-600 hover:underline">+ Add New</button>
-        </div>
-        <div className="space-y-4">
-          {education.length === 0 && <p className="text-center py-6 text-gray-400 font-bold text-xs uppercase tracking-widest border-2 border-dashed border-gray-50 rounded-2xl">No education history added.</p>}
-          {education.map((edu, idx) => (
-            <div key={idx} className="relative bg-gray-50 p-6 rounded-[1.5rem] border border-transparent hover:border-gray-200 transition group">
-              <button 
-                onClick={() => removeEducation(idx)}
-                className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Current Industry</label>
+              <select 
+                value={formData.primaryIndustry}
+                onChange={handleIndustryChange}
+                className="w-full p-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 transition outline-none font-bold text-gray-900"
               >
-                ✕
-              </button>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Institution</label>
-                   <input 
-                    placeholder="e.g. University of Lagos" 
-                    value={edu.institution} 
-                    onChange={e => {
-                      const newEdu = [...education];
-                      newEdu[idx].institution = e.target.value;
-                      setEducation(newEdu);
-                    }}
-                    className="w-full p-2 bg-white border border-gray-100 rounded-xl text-sm font-bold outline-none focus:border-emerald-500"
-                  />
+                <option value="" disabled>Select your sector</option>
+                {industries.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                Primary Skill {formData.primaryIndustry ? `in ${formData.primaryIndustry}` : ''}
+              </label>
+              {!formData.primaryIndustry ? (
+                <div className="p-6 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
+                  <p className="text-sm font-bold text-gray-400 uppercase tracking-tight">Select an industry first</p>
                 </div>
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Degree</label>
-                   <input 
-                    placeholder="e.g. B.Sc Psychology" 
-                    value={edu.degree} 
-                    onChange={e => {
-                      const newEdu = [...education];
-                      newEdu[idx].degree = e.target.value;
-                      setEducation(newEdu);
-                    }}
-                    className="w-full p-2 bg-white border border-gray-100 rounded-xl text-sm font-bold outline-none focus:border-emerald-500"
-                  />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {availableSkills.map(skill => (
+                    <button
+                      key={skill}
+                      onClick={() => setFormData(prev => ({ ...prev, primarySkill: skill }))}
+                      className={`p-4 rounded-xl border-2 text-left font-bold transition-all text-sm flex items-center justify-between ${
+                        formData.primarySkill === skill 
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-md' 
+                          : 'border-gray-50 bg-gray-50 text-gray-500 hover:border-emerald-200'
+                      }`}
+                    >
+                      {skill}
+                      {formData.primarySkill === skill && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                    </button>
+                  ))}
                 </div>
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Year</label>
-                   <input 
-                    placeholder="e.g. 2021" 
-                    value={edu.year} 
-                    onChange={e => {
-                      const newEdu = [...education];
-                      newEdu[idx].year = e.target.value;
-                      setEducation(newEdu);
-                    }}
-                    className="w-full p-2 bg-white border border-gray-100 rounded-xl text-sm font-bold outline-none focus:border-emerald-500"
-                  />
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2: GEOGRAPHY */}
+      <section className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-8 md:p-10 space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
+              <MapPin className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-gray-900">Work Location</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Where you are currently based</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">State</label>
+              <select 
+                value={formData.state}
+                onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                className="w-full p-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 transition outline-none font-bold text-gray-900"
+              >
+                {NIGERIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">City / LGA</label>
+              <input 
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                placeholder="e.g. Ikeja, Maitama"
+                className="w-full p-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 transition outline-none font-bold text-gray-900"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3: PROFESSIONAL HISTORY */}
+      <section className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-8 md:p-10 space-y-10">
+          
+          {/* Experience */}
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
+                  <Briefcase className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">Experience</h3>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Past & Current Roles</p>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 4. EXPERIENCE */}
-      <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 bg-gray-900 text-white rounded-2xl flex items-center justify-center font-black">04</span>
-            <h3 className="text-xl font-black text-gray-900">Experience</h3>
-          </div>
-          <button onClick={addExperience} className="text-xs font-black uppercase tracking-widest text-emerald-600 hover:underline">+ Add New</button>
-        </div>
-        <div className="space-y-4">
-          {experience.length === 0 && <p className="text-center py-6 text-gray-400 font-bold text-xs uppercase tracking-widest border-2 border-dashed border-gray-50 rounded-2xl">No work history added.</p>}
-          {experience.map((exp, idx) => (
-            <div key={idx} className="relative bg-gray-50 p-6 rounded-[1.5rem] border border-transparent hover:border-gray-200 transition">
               <button 
-                onClick={() => removeExperience(idx)}
-                className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
+                onClick={addExperience}
+                className="p-2 bg-gray-50 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
               >
-                ✕
+                <Plus className="w-6 h-6" />
               </button>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Company</label>
-                   <input 
-                    placeholder="e.g. Kuda Bank" 
-                    value={exp.company} 
-                    onChange={e => {
-                      const newExp = [...experience];
-                      newExp[idx].company = e.target.value;
-                      setExperience(newExp);
-                    }}
-                    className="w-full p-2 bg-white border border-gray-100 rounded-xl text-sm font-bold outline-none focus:border-emerald-500"
-                  />
+            </div>
+
+            <div className="space-y-4">
+              {formData.experience.length === 0 ? (
+                <p className="text-center py-8 text-gray-400 font-bold italic text-sm border-2 border-dashed border-gray-50 rounded-3xl">No work history added yet.</p>
+              ) : (
+                formData.experience.map((exp, idx) => (
+                  <div key={idx} className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-gray-200 transition group relative">
+                    <button 
+                      onClick={() => setFormData(prev => ({ ...prev, experience: prev.experience.filter((_, i) => i !== idx) }))}
+                      className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Company</label>
+                        <input 
+                          value={exp.company}
+                          onChange={(e) => {
+                            const next = [...formData.experience];
+                            next[idx].company = e.target.value;
+                            setFormData(prev => ({ ...prev, experience: next }));
+                          }}
+                          className="w-full p-2 bg-white rounded-xl border border-gray-100 font-bold text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Role</label>
+                        <input 
+                          value={exp.role}
+                          onChange={(e) => {
+                            const next = [...formData.experience];
+                            next[idx].role = e.target.value;
+                            setFormData(prev => ({ ...prev, experience: next }));
+                          }}
+                          className="w-full p-2 bg-white rounded-xl border border-gray-100 font-bold text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Duration</label>
+                        <input 
+                          value={exp.duration}
+                          onChange={(e) => {
+                            const next = [...formData.experience];
+                            next[idx].duration = e.target.value;
+                            setFormData(prev => ({ ...prev, experience: next }));
+                          }}
+                          className="w-full p-2 bg-white rounded-xl border border-gray-100 font-bold text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Education */}
+          <div className="space-y-6 pt-6 border-t border-gray-50">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center">
+                  <GraduationCap className="w-6 h-6 text-amber-600" />
                 </div>
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Role</label>
-                   <input 
-                    placeholder="e.g. Product Analyst" 
-                    value={exp.role} 
-                    onChange={e => {
-                      const newExp = [...experience];
-                      newExp[idx].role = e.target.value;
-                      setExperience(newExp);
-                    }}
-                    className="w-full p-2 bg-white border border-gray-100 rounded-xl text-sm font-bold outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                   <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Duration</label>
-                   <input 
-                    placeholder="e.g. 2 years" 
-                    value={exp.duration} 
-                    onChange={e => {
-                      const newExp = [...experience];
-                      newExp[idx].duration = e.target.value;
-                      setExperience(newExp);
-                    }}
-                    className="w-full p-2 bg-white border border-gray-100 rounded-xl text-sm font-bold outline-none focus:border-emerald-500"
-                  />
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">Education</h3>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Academic Background</p>
                 </div>
               </div>
+              <button 
+                onClick={addEducation}
+                className="p-2 bg-gray-50 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+              >
+                <Plus className="w-6 h-6" />
+              </button>
             </div>
-          ))}
+
+            <div className="space-y-4">
+              {formData.education.length === 0 ? (
+                <p className="text-center py-8 text-gray-400 font-bold italic text-sm border-2 border-dashed border-gray-50 rounded-3xl">No education history added yet.</p>
+              ) : (
+                formData.education.map((edu, idx) => (
+                  <div key={idx} className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-gray-200 transition group relative">
+                    <button 
+                      onClick={() => setFormData(prev => ({ ...prev, education: prev.education.filter((_, i) => i !== idx) }))}
+                      className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Institution</label>
+                        <input 
+                          value={edu.institution}
+                          onChange={(e) => {
+                            const next = [...formData.education];
+                            next[idx].institution = e.target.value;
+                            setFormData(prev => ({ ...prev, education: next }));
+                          }}
+                          className="w-full p-2 bg-white rounded-xl border border-gray-100 font-bold text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Degree</label>
+                        <input 
+                          value={edu.degree}
+                          onChange={(e) => {
+                            const next = [...formData.education];
+                            next[idx].degree = e.target.value;
+                            setFormData(prev => ({ ...prev, education: next }));
+                          }}
+                          className="w-full p-2 bg-white rounded-xl border border-gray-100 font-bold text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Year</label>
+                        <input 
+                          value={edu.year}
+                          onChange={(e) => {
+                            const next = [...formData.education];
+                            next[idx].year = e.target.value;
+                            setFormData(prev => ({ ...prev, education: next }));
+                          }}
+                          className="w-full p-2 bg-white rounded-xl border border-gray-100 font-bold text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="pt-8">
-        <button 
+      {/* FLOAT ACTION BAR FOR SAVE (MOBILE-FRIENDLY) */}
+      <div className="fixed bottom-24 left-0 right-0 px-4 md:px-0 flex justify-center z-40 pointer-events-none">
+        <button
           onClick={handleSave}
-          className="w-full bg-emerald-600 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-emerald-700 shadow-2xl shadow-emerald-200 transition transform active:scale-[0.98] flex items-center justify-center gap-3"
+          disabled={!isDirty || isSaving}
+          className={`h-16 w-full max-w-md rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl transition-all flex items-center justify-center gap-3 pointer-events-auto active:scale-95 ${
+            isDirty 
+              ? 'bg-gray-900 text-white shadow-emerald-900/10 hover:bg-black' 
+              : 'bg-gray-100 text-gray-300 shadow-none cursor-not-allowed grayscale'
+          }`}
         >
-          {isCompletingProfile ? 'See My Career Matches' : 'Update My Algorithm Score'}
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          {isSaving ? <Save className="w-5 h-5 animate-bounce" /> : <Save className="w-5 h-5" />}
+          {isSaving ? 'Synchronizing...' : isDirty ? 'Save Career Updates' : 'No Changes Detected'}
         </button>
       </div>
-
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </div>
   );
 };

@@ -1,85 +1,86 @@
 
-import { UserProfile, Job, UserRole } from '../types';
-
-export const MOCK_SEEKER: UserProfile = {
-  id: 'u1',
-  fullName: 'Chidi Okeke',
-  role: UserRole.SEEKER,
-  skills: ['1', '3', '10'], // React, Generator Repair, Customer Service
-  location: {
-    state: 'Lagos',
-    lga: 'Ikeja',
-    city: 'Ikeja',
-    lat: 6.5965,
-    lon: 3.3421
-  },
-  remotePreference: true,
-  relocatePreference: false,
-  savedJobIds: [],
-  appliedJobIds: [],
-  education: [
-    { institution: 'University of Lagos', degree: 'B.Sc Computer Science', year: '2022' }
-  ],
-  experience: [
-    { company: 'TechStart Nigeria', role: 'Junior Developer', duration: '1 year' }
-  ]
-};
-
-export const MOCK_JOBS: Job[] = [
+/**
+ * REPRESENTATIVE SAMPLE OF GENERATED NIGERIAN JOB RECORDS (Top 5 Geographies)
+ */
+export const SAMPLE_GENERATED_JOBS: any[] = [
   {
-    id: 'j1',
-    employerId: 'e1',
-    employerName: 'Paystack',
-    title: 'Frontend Engineer',
-    industry: 'Technology',
-    description: 'Looking for React experts in Lagos.',
-    requiredSkills: ['1', '2', '9'],
-    location: { state: 'Lagos', lga: 'Ikeja', city: 'Ikeja', lat: 6.5965, lon: 3.3421 },
-    isRemote: true,
-    status: 'OPEN',
-    // Fix: Added missing createdAt property
-    createdAt: new Date().toISOString()
+    job_id: "job-00001",
+    job_title: "Software Engineer (Frontend Development)",
+    industry: "Technology",
+    skill: "Frontend Development",
+    state: "Lagos",
+    city_or_LGA: "Ikeja",
+    geo_zone: "South West",
+    job_description: "Build responsive interfaces for national logistics platforms. High-bandwidth optimization required for rural mobile users.",
+    employment_type: "Full-time",
+    salary_range: "₦350,000 - ₦520,000",
+    experience_level: "Intermediate",
+    employer_name: "Interswitch",
+    date_posted: "2024-05-15T10:00:00Z",
+    status: "OPEN"
   },
   {
-    id: 'j2',
-    employerId: 'e2',
-    employerName: 'AgroAllied Ltd',
-    title: 'Technician',
-    industry: 'Agriculture',
-    description: 'Maintenance of farm generators and equipment.',
-    requiredSkills: ['3', '8'],
-    location: { state: 'Kaduna', lga: 'Chikun', city: 'Kaduna', lat: 10.5105, lon: 7.4165 },
-    isRemote: false,
-    status: 'OPEN',
-    // Fix: Added missing createdAt property
-    createdAt: new Date().toISOString()
+    job_id: "job-00002",
+    job_title: "Farm Manager (Crop Farming)",
+    industry: "Agriculture",
+    skill: "Crop Farming",
+    state: "Benue",
+    city_or_LGA: "Gboko",
+    geo_zone: "North Central",
+    job_description: "Overseer large-scale mechanized cassava plantation. Focus on yield optimization and soil health management.",
+    employment_type: "Contract",
+    salary_range: "₦120,000 - ₦180,000",
+    experience_level: "Intermediate",
+    employer_name: "Olam Agriculture",
+    date_posted: "2024-05-14T08:30:00Z",
+    status: "OPEN"
   },
   {
-    id: 'j3',
-    employerId: 'e3',
-    employerName: 'Ibadan Solar',
-    title: 'Support Desk',
-    industry: 'Renewable Energy',
-    description: 'Helping customers with solar setup.',
-    requiredSkills: ['10', '8'],
-    location: { state: 'Oyo', lga: 'Ibadan', city: 'Ibadan', lat: 7.3775, lon: 3.9470 },
-    isRemote: false,
-    status: 'OPEN',
-    // Fix: Added missing createdAt property
-    createdAt: new Date().toISOString()
+    job_id: "job-00003",
+    job_title: "Community Health Worker (Health Support)",
+    industry: "Healthcare",
+    skill: "Community Health Assistance",
+    state: "Borno",
+    city_or_LGA: "Maiduguri",
+    geo_zone: "North East",
+    job_description: "Provide primary maternal health support and coordinate vaccination drives in semi-urban communities.",
+    employment_type: "Full-time",
+    salary_range: "₦95,000 - ₦140,000",
+    experience_level: "Entry",
+    employer_name: "NGO Coalition",
+    date_posted: "2024-05-13T12:15:00Z",
+    status: "OPEN"
+  },
+  {
+    job_id: "job-00004",
+    job_title: "Heavy Duty Driver (Truck Driving)",
+    industry: "Transportation",
+    skill: "Truck Driving",
+    state: "Kano",
+    city_or_LGA: "Fagge",
+    geo_zone: "North West",
+    job_description: "Long-haul freight transport across the Trans-Saharan corridor. Responsible for vehicle safety and log management.",
+    employment_type: "Full-time",
+    salary_range: "₦150,000 - ₦220,000",
+    experience_level: "Senior",
+    employer_name: "Dangote Refinery",
+    date_posted: "2024-05-12T09:45:00Z",
+    status: "OPEN"
+  },
+  {
+    job_id: "job-00005",
+    job_title: "Civil Engineer (Masonry Specialist)",
+    industry: "Construction",
+    skill: "Masonry",
+    state: "Rivers",
+    city_or_LGA: "Port Harcourt",
+    geo_zone: "South South",
+    job_description: "Supervise structural masonry for offshore staff residential quarters. Expert knowledge of saline-resistant materials required.",
+    employment_type: "Full-time",
+    salary_range: "₦450,000 - ₦680,000",
+    experience_level: "Senior",
+    employer_name: "Julius Berger",
+    date_posted: "2024-05-11T16:20:00Z",
+    status: "OPEN"
   }
 ];
-
-export const MOCK_EMPLOYER: UserProfile = {
-  id: 'e1',
-  fullName: 'Boluwatife Adeleke',
-  role: UserRole.EMPLOYER,
-  skills: [],
-  location: { state: 'Lagos', lga: 'Lekki', city: 'Lagos', lat: 6.4589, lon: 3.6015 },
-  remotePreference: false,
-  relocatePreference: false,
-  savedJobIds: [],
-  appliedJobIds: [],
-  education: [],
-  experience: []
-};
