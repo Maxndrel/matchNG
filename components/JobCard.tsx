@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState, useEffect, memo, useCallback } from 'react';
 import { MatchResult, ApplicationStatus } from '../types';
@@ -13,10 +14,9 @@ interface JobCardProps {
 }
 
 const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplied, isSaved }) => {
-  const { job, scoreSkill, scoreLocation, scoreTrend, scoreFinal } = match;
+  const { job, scoreFinal } = match;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  // Default to true for SSR safety; will correct on mount
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {

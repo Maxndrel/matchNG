@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState } from 'react';
 import { UserRole, UserProfile } from '../../types';
@@ -123,17 +124,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
             {mode === 'LOGIN' ? 'Sign in with Google' : 'Sign up with Google'}
           </button>
 
-          <div className="flex items-center my-6">
-            <div className="flex-grow border-t border-gray-100"></div>
-            <span className="px-4 text-xs font-bold text-gray-400 uppercase tracking-widest">or</span>
-            <div className="flex-grow border-t border-gray-100"></div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5 mt-6">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">
-                {mode === 'REGISTER' ? 'Full Name' : 'Full Name (to simulate login)'}
-              </label>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Full Name</label>
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
@@ -141,7 +134,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Chidi Okeke"
+                  placeholder="e.g. Chidi Okeke"
                   className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition outline-none text-gray-900"
                 />
               </div>
@@ -149,7 +142,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
 
             {mode === 'REGISTER' && (
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">I want to join as a</label>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">I am a</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -177,42 +170,23 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
-                  type="email" 
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@email.com"
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition outline-none text-gray-900"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
-                  type="password" 
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition outline-none text-gray-900"
-                />
-              </div>
-            </div>
-
             <button 
               type="submit"
               className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition transform active:scale-95"
             >
               {mode === 'LOGIN' ? 'Sign In' : 'Create Account'}
             </button>
+            
+            <p className="text-center text-xs text-gray-400 font-bold mt-4">
+              {mode === 'LOGIN' ? "Don't have an account?" : "Already have an account?"}
+              <button 
+                type="button"
+                onClick={() => setMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN')}
+                className="ml-1 text-emerald-600 hover:underline"
+              >
+                {mode === 'LOGIN' ? 'Register' : 'Login'}
+              </button>
+            </p>
           </form>
         </div>
       </div>

@@ -1,4 +1,3 @@
-
 import { UserProfile, Job, UserRole, IndustryTrend, PendingAction, JobApplication, Notification, ApplicationStatus } from '../types';
 import { MOCK_SEEKER, MOCK_EMPLOYER } from './mockData';
 import { TREND_DATA, SKILL_TAXONOMY, NIGERIA_STATES, INDUSTRIES } from '../constants';
@@ -22,10 +21,7 @@ const _cache = {
   isLoaded: false
 };
 
-// Comprehensive browser check
-const isBrowser = typeof window !== 'undefined' && 
-                  typeof localStorage !== 'undefined' && 
-                  typeof navigator !== 'undefined';
+const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 
 const safeGet = (key: string): any | null => {
   if (!isBrowser) return null;
@@ -106,25 +102,9 @@ export const getApplicationsBySeeker = (seekerId: string): JobApplication[] => {
 export const saveApplication = (app: JobApplication) => {
   if (!isBrowser) return;
   _isInternalUpdate = true;
-  const exists = _cache.applications.find(a => a.jobId === app.jobId && a.seekerId === app.seekerId);
-  if (exists && app.id !== exists.id) {
-    _isInternalUpdate = false;
-    return;
-  }
-
   const idx = _cache.applications.findIndex(a => a.id === app.id);
-  if (idx > -1) {
-    _cache.applications[idx] = { ...app };
-  } else {
-    _cache.applications.push({ ...app });
-    addNotification({
-      userId: app.employerId,
-      title: 'New Application',
-      message: `${app.seekerName} applied for your role: ${app.jobTitle}`,
-      type: 'APPLICATION',
-      linkToTab: 'APPLICATIONS'
-    });
-  }
+  if (idx > -1) _cache.applications[idx] = { ...app };
+  else _cache.applications.push({ ...app });
 
   safeSet(KEYS.APPLICATIONS, _cache.applications);
   _isInternalUpdate = false;
@@ -134,19 +114,6 @@ export const saveApplication = (app: JobApplication) => {
 export const getNotifications = (userId: string): Notification[] => {
   if (!isBrowser) return [];
   return _cache.notifications.filter(n => n.userId === userId);
-};
-
-export const addNotification = (notif: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => {
-  if (!isBrowser) return;
-  const newNotif: Notification = {
-    ...notif,
-    id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    timestamp: new Date().toISOString(),
-    isRead: false
-  };
-  _cache.notifications.unshift(newNotif);
-  safeSet(KEYS.NOTIFICATIONS, _cache.notifications);
-  notifyStorageChange();
 };
 
 export const markNotifRead = (id: string) => {
@@ -181,10 +148,6 @@ export const saveUser = (user: UserProfile) => {
   if (idx > -1) _cache.users[idx] = { ...user };
   else _cache.users.push({ ...user });
   safeSet(KEYS.USERS, _cache.users);
-  if (_cache.activeUser?.id === user.id) {
-    _cache.activeUser = { ...user };
-    safeSet(KEYS.ACTIVE_USER, user);
-  }
   _isInternalUpdate = false;
   notifyStorageChange();
 };
@@ -195,15 +158,6 @@ export const saveJob = (job: Job) => {
   const idx = _cache.jobs.findIndex(j => j.id === job.id);
   if (idx > -1) _cache.jobs[idx] = { ...job };
   else _cache.jobs.push({ ...job });
-  safeSet(KEYS.JOBS, _cache.jobs);
-  _isInternalUpdate = false;
-  notifyStorageChange();
-};
-
-export const deleteJob = (jobId: string, employerId: string) => {
-  if (!isBrowser) return;
-  _isInternalUpdate = true;
-  _cache.jobs = _cache.jobs.filter(j => !(j.id === jobId && j.employerId === employerId));
   safeSet(KEYS.JOBS, _cache.jobs);
   _isInternalUpdate = false;
   notifyStorageChange();

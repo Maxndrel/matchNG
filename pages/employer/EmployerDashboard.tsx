@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -9,8 +10,7 @@ import {
   saveApplication, 
   getNotifications, 
   markNotifRead,
-  saveJob,
-  deleteJob
+  saveJob
 } from '../../services/storage';
 import { computeCandidateMatch } from '../../services/matchingEngine';
 import { INDUSTRIES, SKILL_TAXONOMY, NIGERIA_STATES, SKILL_INDEX } from '../../constants';

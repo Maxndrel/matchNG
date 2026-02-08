@@ -25,7 +25,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleSync = () => {
       const session = getActiveUser();
-      // Only update if data actually changed to prevent infinite loops
       if (JSON.stringify(session) !== JSON.stringify(activeUser)) {
         setActiveUser(session);
       }
@@ -39,17 +38,15 @@ const App: React.FC = () => {
 
   // Root Client-Only Hydration Hook
   useEffect(() => {
-    // 1. Initialize data store only on client mount
     initializeStorage();
-    
-    // 2. Fetch session and determine initial page
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      setCurrentPage('DASHBOARD');
+      // Auto-redirect to dashboard if session exists, but only after mount
+      if (currentPage === 'LANDING' || currentPage === 'LOGIN') {
+        setCurrentPage('DASHBOARD');
+      }
     }
-    
-    // 3. Mark app as hydrated to safely render client-only content
     setIsHydrated(true);
   }, []);
 
@@ -80,20 +77,14 @@ const App: React.FC = () => {
 
     if ((isDashboardRoute || isAdminRoute) && !activeUser) {
       setCurrentPage('LOGIN');
-      return;
-    }
-
-    if (isAdminRoute && activeUser?.role !== UserRole.ADMIN) {
-      setCurrentPage('LANDING');
     }
   }, [currentPage, activeUser, isHydrated]);
 
-  // Render a minimal loader until the client state is hydrated to prevent white page
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
         <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-400 font-bold text-xs uppercase tracking-widest animate-pulse">Initializing Engine...</p>
+        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">matchNG Engine Booting...</p>
       </div>
     );
   }
@@ -115,12 +106,12 @@ const App: React.FC = () => {
       case 'REGISTER':
         return <AuthPage initialMode="REGISTER" onAuthSuccess={handleAuthSuccess} />;
       case 'DASHBOARD':
-        if (!activeUser) return null;
+        if (!activeUser) return <Landing onStart={() => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
         return activeUser.role === UserRole.SEEKER 
           ? <SeekerDashboard user={activeUser} onUpdateUser={handleUpdateUser} />
           : <EmployerDashboard user={activeUser} onUpdateUser={handleUpdateUser} />;
       case 'ADMIN':
-        return activeUser?.role === UserRole.ADMIN ? <AdminDashboard /> : null;
+        return activeUser?.role === UserRole.ADMIN ? <AdminDashboard /> : <Landing onStart={() => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
       default:
         return <Landing onStart={() => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
     }
