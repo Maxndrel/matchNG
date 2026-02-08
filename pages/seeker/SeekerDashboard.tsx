@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { UserProfile, Job, MatchResult } from '../../types';
@@ -37,13 +38,15 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
   const [activeTab, setActiveTab] = useState<NavTabId>('OVERVIEW');
   const [isMounted, setIsMounted] = useState(false);
 
-  // Persistence logic for the active tab across refreshes - MOVED TO EFFECT
+  // Persistence logic for the active tab across refreshes
   useEffect(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('matchNG_last_tab') : null;
-    if (saved) {
-      setActiveTab(saved as NavTabId);
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('matchNG_last_tab');
+      if (saved) {
+        setActiveTab(saved as NavTabId);
+      }
+      setIsMounted(true);
     }
-    setIsMounted(true);
   }, []);
 
   useEffect(() => {
@@ -99,12 +102,9 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
     onUpdateUser(updatedUser);
   };
 
+  // Prevent UI flicker/mismatch during hydration
   if (!isMounted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <div className="min-h-[50vh] flex items-center justify-center"><div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div></div>;
   }
 
   const renderContent = () => {

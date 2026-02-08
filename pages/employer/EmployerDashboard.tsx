@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { UserProfile, Job, UserRole, ApplicationStatus, JobApplication, Notification } from '../../types';
@@ -48,7 +49,6 @@ const QUICK_ACTIONS = [
 ];
 
 const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUser }) => {
-  // Initialize with default, populate from storage in useEffect
   const [activeTab, setActiveTab] = useState<EmployerTabId>('OVERVIEW');
   const [isMounted, setIsMounted] = useState(false);
 
@@ -68,14 +68,17 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     isRemote: false, status: 'OPEN'
   });
 
-  // Client-only hydration for tab state
+  // Client-only hydration
   useEffect(() => {
-    const saved = localStorage.getItem('matchNG_employer_tab');
-    if (saved) setActiveTab(saved as EmployerTabId);
-    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('matchNG_employer_tab');
+      if (saved) setActiveTab(saved as EmployerTabId);
+      setIsMounted(true);
+    }
   }, []);
 
   const refreshData = useCallback(() => {
+    if (typeof window === 'undefined') return;
     setAllJobs(getJobsByEmployer(user.id));
     setSeekers(getUsers().filter(u => u.role === UserRole.SEEKER));
     setApplications(getApplicationsByEmployer(user.id));
@@ -84,12 +87,14 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
 
   useEffect(() => {
     refreshData();
-    window.addEventListener('storage-sync', refreshData);
-    return () => window.removeEventListener('storage-sync', refreshData);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage-sync', refreshData);
+      return () => window.removeEventListener('storage-sync', refreshData);
+    }
   }, [refreshData]);
 
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && typeof window !== 'undefined') {
       localStorage.setItem('matchNG_employer_tab', activeTab);
     }
   }, [activeTab, isMounted]);
@@ -112,9 +117,8 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     return seekers.map(s => computeCandidateMatch(job, s)).sort((a, b) => b.scoreFinal - a.scoreFinal);
   }, [selectedJobId, allJobs, seekers]);
 
-  // -----------------------------------------------------------------------------
-  // RENDERERS
-  // -----------------------------------------------------------------------------
+  if (!isMounted) return null;
+
   const renderOverview = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-24">
       <header className="flex justify-between items-start">

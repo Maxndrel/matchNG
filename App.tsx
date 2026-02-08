@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole } from './types';
@@ -24,13 +25,16 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleSync = () => {
       const session = getActiveUser();
+      // Only update if data actually changed to prevent infinite loops
       if (JSON.stringify(session) !== JSON.stringify(activeUser)) {
         setActiveUser(session);
       }
     };
 
-    window.addEventListener('storage-sync', handleSync);
-    return () => window.removeEventListener('storage-sync', handleSync);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage-sync', handleSync);
+      return () => window.removeEventListener('storage-sync', handleSync);
+    }
   }, [activeUser]);
 
   // Root Client-Only Hydration Hook
@@ -38,7 +42,7 @@ const App: React.FC = () => {
     // 1. Initialize data store only on client mount
     initializeStorage();
     
-    // 2. Fetch session
+    // 2. Fetch session and determine initial page
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
@@ -84,11 +88,12 @@ const App: React.FC = () => {
     }
   }, [currentPage, activeUser, isHydrated]);
 
-  // Render a minimal layout or loader until the client state is hydrated
+  // Render a minimal loader until the client state is hydrated to prevent white page
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-400 font-bold text-xs uppercase tracking-widest animate-pulse">Initializing Engine...</p>
       </div>
     );
   }
