@@ -5,6 +5,13 @@ export enum UserRole {
   ADMIN = 'ADMIN'
 }
 
+export enum ApplicationStatus {
+  PENDING = 'PENDING',
+  SHORTLISTED = 'SHORTLISTED',
+  REJECTED = 'REJECTED',
+  HIRED = 'HIRED'
+}
+
 export interface Education {
   institution: string;
   degree: string;
@@ -32,7 +39,6 @@ export interface IndustryTrend {
   trendScore: number;
 }
 
-// Added Skill interface
 export interface Skill {
   id: string;
   name: string;
@@ -48,7 +54,7 @@ export interface UserProfile {
   remotePreference: boolean;
   relocatePreference: boolean;
   savedJobIds: string[];
-  appliedJobIds: string[];
+  appliedJobIds: string[]; // Kept for legacy compatibility and quick lookups
   education?: Education[];
   experience?: Experience[];
   companyName?: string;
@@ -70,6 +76,28 @@ export interface Job {
   salaryRange?: string;
 }
 
+export interface JobApplication {
+  id: string;
+  jobId: string;
+  seekerId: string;
+  employerId: string;
+  status: ApplicationStatus;
+  timestamp: string;
+  seekerName: string;
+  jobTitle: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string; // Target user
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+  type: 'APPLICATION' | 'STATUS_CHANGE' | 'SYSTEM';
+  linkToTab?: string;
+}
+
 export interface MatchResult {
   job: Job;
   scoreSkill: number;
@@ -86,8 +114,7 @@ export interface CandidateResult {
   scoreFinal: number;
 }
 
-// Offline Action Queue Types
-export type ActionType = 'APPLY' | 'SAVE_JOB' | 'UPDATE_PROFILE';
+export type ActionType = 'APPLY' | 'SAVE_JOB' | 'UPDATE_PROFILE' | 'UPDATE_APP_STATUS';
 
 export interface PendingAction {
   id: string;
