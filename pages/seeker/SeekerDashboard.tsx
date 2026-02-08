@@ -38,7 +38,6 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
   const [activeTab, setActiveTab] = useState<NavTabId>('OVERVIEW');
   const [isMounted, setIsMounted] = useState(false);
 
-  // Persistence logic for the active tab across refreshes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('matchNG_last_tab');
@@ -102,9 +101,13 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
     onUpdateUser(updatedUser);
   };
 
-  // Prevent UI flicker/mismatch during hydration
   if (!isMounted) {
-    return <div className="min-h-[50vh] flex items-center justify-center"><div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div></div>;
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-widest animate-pulse">Syncing matches...</p>
+      </div>
+    );
   }
 
   const renderContent = () => {

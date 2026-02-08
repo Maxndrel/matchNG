@@ -24,6 +24,7 @@ const App: React.FC = () => {
   // Synchronize internal state with storage service notifications
   useEffect(() => {
     const handleSync = () => {
+      if (typeof window === 'undefined') return;
       const session = getActiveUser();
       if (JSON.stringify(session) !== JSON.stringify(activeUser)) {
         setActiveUser(session);
@@ -38,11 +39,13 @@ const App: React.FC = () => {
 
   // Root Client-Only Hydration Hook
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     initializeStorage();
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      // Auto-redirect to dashboard if session exists, but only after mount
+      // Auto-redirect to dashboard if session exists
       if (currentPage === 'LANDING' || currentPage === 'LOGIN') {
         setCurrentPage('DASHBOARD');
       }
@@ -68,7 +71,7 @@ const App: React.FC = () => {
     setActiveUser(updated);
   }, []);
 
-  // Guard navigation logic: wait for hydration
+  // Protected route logic
   useEffect(() => {
     if (!isHydrated) return;
 
@@ -80,6 +83,7 @@ const App: React.FC = () => {
     }
   }, [currentPage, activeUser, isHydrated]);
 
+  // Ensure there's always a rendered tree during build/hydration
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
