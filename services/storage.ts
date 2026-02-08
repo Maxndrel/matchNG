@@ -22,7 +22,8 @@ const _cache = {
   isLoaded: false
 };
 
-const isBrowser = typeof window !== 'undefined';
+// Strict environment check
+const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 
 const safeGet = (key: string): any | null => {
   if (!isBrowser) return null;
@@ -30,7 +31,6 @@ const safeGet = (key: string): any | null => {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : null;
   } catch (e) {
-    console.warn(`matchNG: Failed to parse storage key "${key}"`, e);
     return null;
   }
 };
@@ -40,7 +40,7 @@ const safeSet = (key: string, data: any) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
-    console.error(`matchNG: Failed to set storage key "${key}"`, e);
+    // Fail silently to prevent server hang
   }
 };
 
@@ -48,7 +48,10 @@ let _isInternalUpdate = false;
 
 const notifyStorageChange = () => {
   if (_isInternalUpdate || !isBrowser) return;
-  window.dispatchEvent(new Event('storage-sync'));
+  // Use requestAnimationFrame to prevent event flooding
+  window.requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('storage-sync'));
+  });
 };
 
 export const initializeStorage = () => {
@@ -89,17 +92,18 @@ const generateMockJobs = (count: number): Job[] => {
   }));
 };
 
-// --- APPLICATION LOGIC ---
-
 export const getApplicationsByEmployer = (employerId: string): JobApplication[] => {
+  if (!isBrowser) return [];
   return _cache.applications.filter(a => a.employerId === employerId);
 };
 
 export const getApplicationsBySeeker = (seekerId: string): JobApplication[] => {
+  if (!isBrowser) return [];
   return _cache.applications.filter(a => a.seekerId === seekerId);
 };
 
 export const saveApplication = (app: JobApplication) => {
+  if (!isBrowser) return;
   _isInternalUpdate = true;
   const exists = _cache.applications.find(a => a.jobId === app.jobId && a.seekerId === app.seekerId);
   if (exists && app.id !== exists.id) {
@@ -126,13 +130,13 @@ export const saveApplication = (app: JobApplication) => {
   notifyStorageChange();
 };
 
-// --- NOTIFICATION LOGIC ---
-
 export const getNotifications = (userId: string): Notification[] => {
+  if (!isBrowser) return [];
   return _cache.notifications.filter(n => n.userId === userId);
 };
 
 export const addNotification = (notif: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => {
+  if (!isBrowser) return;
   const newNotif: Notification = {
     ...notif,
     id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -145,6 +149,7 @@ export const addNotification = (notif: Omit<Notification, 'id' | 'timestamp' | '
 };
 
 export const markNotifRead = (id: string) => {
+  if (!isBrowser) return;
   const notif = _cache.notifications.find(n => n.id === id);
   if (notif) {
     notif.isRead = true;
@@ -153,16 +158,23 @@ export const markNotifRead = (id: string) => {
   }
 };
 
-// --- BASE STORAGE ---
+export const getUsers = (): UserProfile[] => {
+  if (!isBrowser) return [];
+  return _cache.users;
+};
 
-export const getUsers = (): UserProfile[] => _cache.users;
-export const getJobs = (): Job[] => _cache.jobs;
+export const getJobs = (): Job[] => {
+  if (!isBrowser) return [];
+  return _cache.jobs;
+};
 
 export const getJobsByEmployer = (employerId: string): Job[] => {
+  if (!isBrowser) return [];
   return _cache.jobs.filter(j => j.employerId === employerId);
 };
 
 export const saveUser = (user: UserProfile) => {
+  if (!isBrowser) return;
   _isInternalUpdate = true;
   const idx = _cache.users.findIndex(u => u.id === user.id);
   if (idx > -1) _cache.users[idx] = { ...user };
@@ -177,6 +189,7 @@ export const saveUser = (user: UserProfile) => {
 };
 
 export const saveJob = (job: Job) => {
+  if (!isBrowser) return;
   _isInternalUpdate = true;
   const idx = _cache.jobs.findIndex(j => j.id === job.id);
   if (idx > -1) _cache.jobs[idx] = { ...job };
@@ -187,6 +200,7 @@ export const saveJob = (job: Job) => {
 };
 
 export const deleteJob = (jobId: string, employerId: string) => {
+  if (!isBrowser) return;
   _isInternalUpdate = true;
   _cache.jobs = _cache.jobs.filter(j => !(j.id === jobId && j.employerId === employerId));
   safeSet(KEYS.JOBS, _cache.jobs);
@@ -200,21 +214,28 @@ export const getActiveUser = (): UserProfile | null => {
 };
 
 export const setActiveUser = (user: UserProfile | null) => {
+  if (!isBrowser) return;
   _cache.activeUser = user;
   if (user) safeSet(KEYS.ACTIVE_USER, user);
-  else if (isBrowser) localStorage.removeItem(KEYS.ACTIVE_USER);
+  else localStorage.removeItem(KEYS.ACTIVE_USER);
   notifyStorageChange();
 };
 
 export const addPendingAction = (action: Omit<PendingAction, 'id' | 'timestamp' | 'retryCount'>) => {
+  if (!isBrowser) return;
   const newAction: PendingAction = { ...action, id: `act-${Date.now()}`, timestamp: Date.now(), retryCount: 0 };
   _cache.queue.push(newAction);
   safeSet(KEYS.QUEUE, _cache.queue);
   notifyStorageChange();
 };
 
-export const getPendingActions = () => _cache.queue;
+export const getPendingActions = () => {
+  if (!isBrowser) return [];
+  return _cache.queue;
+};
+
 export const removePendingAction = (id: string) => {
+  if (!isBrowser) return;
   _cache.queue = _cache.queue.filter(a => a.id !== id);
   safeSet(KEYS.QUEUE, _cache.queue);
   notifyStorageChange();

@@ -34,15 +34,23 @@ interface SeekerDashboardProps {
 }
 
 const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser }) => {
-  // Persistence logic for the active tab across refreshes
-  const [activeTab, setActiveTab] = useState<NavTabId>(() => {
-    const saved = localStorage.getItem('matchNG_last_tab');
-    return (saved as NavTabId) || 'OVERVIEW';
-  });
+  const [activeTab, setActiveTab] = useState<NavTabId>('OVERVIEW');
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Persistence logic for the active tab across refreshes - MOVED TO EFFECT
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('matchNG_last_tab') : null;
+    if (saved) {
+      setActiveTab(saved as NavTabId);
+    }
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('matchNG_last_tab', activeTab);
-  }, [activeTab]);
+    if (isMounted && typeof window !== 'undefined') {
+      localStorage.setItem('matchNG_last_tab', activeTab);
+    }
+  }, [activeTab, isMounted]);
 
   const jobs = useMemo(() => getJobs(), [user.id]);
   
@@ -90,6 +98,14 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
     };
     onUpdateUser(updatedUser);
   };
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (activeTab) {
