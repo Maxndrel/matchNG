@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole } from './types';
@@ -22,8 +23,11 @@ const App: React.FC = () => {
 
   // Synchronize internal state with storage service notifications
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const handleSync = () => {
       const session = getActiveUser();
+      // Only update if IDs differ to prevent infinite re-renders
       if (session?.id !== activeUser?.id) {
         setActiveUser(session);
       }
@@ -33,16 +37,30 @@ const App: React.FC = () => {
     return () => window.removeEventListener('storage-sync', handleSync);
   }, [activeUser?.id]);
 
-  // Root Initialization
+  // Root Initialization - Runs only once on mount
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 1. Setup local storage and initial data
     initializeStorage();
+    
+    // 2. Hydrate session state
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      // Auto-redirect if session is active
+      // Auto-redirect to dashboard if user hits root pages with an active session
       setCurrentPage(prev => (prev === 'LANDING' || prev === 'LOGIN' || prev === 'REGISTER') ? 'DASHBOARD' : prev);
     }
+    
+    // 3. Mark app as ready for interactive rendering
     setIsHydrated(true);
+
+    // Remove the static fallback loader from index.html if it exists
+    const loader = document.getElementById('loader');
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => loader.remove(), 300);
+    }
   }, []);
 
   const handleAuthSuccess = (user: UserProfile) => {
@@ -63,22 +81,18 @@ const App: React.FC = () => {
     setActiveUser(updated);
   }, []);
 
-  // Protected route logic
+  // Protected route logic - check session requirements after hydration
   useEffect(() => {
     if (!isHydrated) return;
-    const isProtected = currentPage === 'DASHBOARD' || currentPage === 'ADMIN';
-    if (isProtected && !activeUser) {
+    const isProtectedRoute = currentPage === 'DASHBOARD' || currentPage === 'ADMIN';
+    if (isProtectedRoute && !activeUser) {
       setCurrentPage('LOGIN');
     }
   }, [currentPage, activeUser, isHydrated]);
 
+  // Don't render the main tree until client-side hydration is complete
   if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">Initializing Engine...</p>
-      </div>
-    );
+    return null; // The loader in index.html will handle this state
   }
 
   const renderPage = () => {
@@ -116,7 +130,7 @@ const App: React.FC = () => {
       onLogout={handleLogout}
       onNavigate={setCurrentPage}
     >
-      <div className="min-h-[65vh] fade-in">
+      <div className="min-h-[70vh] fade-in">
         {renderPage()}
       </div>
     </Layout>

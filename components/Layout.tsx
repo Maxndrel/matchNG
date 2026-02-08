@@ -1,3 +1,4 @@
+'use client';
 
 import React from 'react';
 import Navbar from './Navbar';
@@ -12,7 +13,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, userRole, userName, onLogout, onNavigate }) => {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar 
         role={userRole} 
         userName={userName}

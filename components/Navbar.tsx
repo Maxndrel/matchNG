@@ -29,13 +29,26 @@ const Navbar: React.FC<NavbarProps> = ({ role, userName, onLogout, onNavigate })
     { label: 'Contact', page: 'CONTACT' },
   ];
 
+  const handleLogoClick = () => {
+    // If user is logged in (has a role), do nothing.
+    // If not logged in, navigate to landing page.
+    if (!role) {
+      onNavigate?.('LANDING');
+    }
+  };
+
   return (
     <nav className="bg-white border-b sticky top-0 z-50 backdrop-blur-md bg-white/80">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div 
-            onClick={() => onNavigate?.('LANDING')} 
-            className="flex items-center gap-2 text-2xl font-black cursor-pointer transition-opacity hover:opacity-90"
+            onClick={handleLogoClick} 
+            className={`flex items-center gap-2 text-2xl font-black transition-all ${
+              !role 
+                ? 'cursor-pointer hover:opacity-90 active:scale-95' 
+                : 'cursor-default'
+            }`}
+            title={role ? "You are currently on your dashboard" : "Go to matchNG Home"}
           >
             <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
               <Briefcase className="text-white w-6 h-6" />
