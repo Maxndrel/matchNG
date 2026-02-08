@@ -45,7 +45,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelect, disabled }) 
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close "More" menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -58,7 +57,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelect, disabled }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMoreOpen]);
 
-  // Determine if the "More" item is effectively active
   const isMoreActive = MORE_ITEMS.some(item => item.id === activeTab);
 
   const handleNavClick = (config: NavConfig) => {
@@ -73,7 +71,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelect, disabled }) 
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[100] flex flex-col items-center pointer-events-none">
+    <div className="fixed bottom-0 left-0 right-0 z-[100] flex flex-col items-center pointer-events-none pb-safe">
       {/* More Menu Overlay */}
       {isMoreOpen && (
         <div 
@@ -88,10 +86,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelect, disabled }) 
                   onSelect(item.id);
                   setIsMoreOpen(false);
                 }}
-                className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${
+                className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all active:bg-gray-50 ${
                   activeTab === item.id 
-                    ? 'bg-emerald-50 text-emerald-700' 
-                    : 'hover:bg-gray-50 text-gray-600'
+                    ? 'bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-900/5' 
+                    : 'text-gray-600'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -106,7 +104,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelect, disabled }) 
       )}
 
       {/* Main Bottom Nav Bar */}
-      <nav className="w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 h-20 px-2 pb-safe shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] pointer-events-auto">
+      <nav className="w-full bg-white/95 backdrop-blur-xl border-t border-gray-100 h-20 px-2 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] pointer-events-auto select-none">
         <div className="max-w-xl mx-auto h-full flex items-center justify-between">
           {BOTTOM_NAV_CONFIG.map((item) => {
             const isActive = item.id === 'MORE' ? isMoreActive : activeTab === item.id;
@@ -117,16 +115,16 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelect, disabled }) 
                 key={item.id}
                 onClick={() => handleNavClick(item)}
                 disabled={disabled}
-                className={`flex flex-col items-center justify-center flex-1 h-full gap-1.5 transition-all relative ${
+                className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-all relative active:scale-95 ${
                   disabled ? 'opacity-30 cursor-not-allowed' : ''
                 } ${
                   isActive ? 'text-emerald-600' : 'text-gray-400'
                 }`}
               >
-                <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-emerald-50 scale-110' : ''}`}>
+                <div className={`p-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-emerald-50 scale-110 shadow-sm' : ''}`}>
                   <Icon className={`w-6 h-6 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                 </div>
-                <span className={`text-[10px] font-black uppercase tracking-tighter ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-60'}`}>
                   {item.label}
                 </span>
                 {isActive && (

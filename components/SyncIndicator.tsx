@@ -1,4 +1,6 @@
 
+"use client";
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Cloud, CloudOff, RefreshCw, CheckCircle2, Wifi, WifiOff } from 'lucide-react';
 import { getPendingActions, removePendingAction, saveUser, getActiveUser } from '../services/storage.ts';
@@ -18,7 +20,6 @@ const SyncIndicator: React.FC = () => {
 
     const updateStatus = () => {
       const currentOnline = navigator.onLine;
-      // If we just went from offline to online
       if (!prevOnlineRef.current && currentOnline) {
         setShowLiveStatus(true);
         setTimeout(() => setShowLiveStatus(false), 3000);
@@ -88,55 +89,49 @@ const SyncIndicator: React.FC = () => {
     setIsSyncing(false);
   };
 
-  // If online, synced, and not showing the temporary "Back Online" message, render nothing
   if (isOnline && pendingCount === 0 && !isSyncing && !showLiveStatus) {
     return null;
   }
 
   return (
-    <div className="relative">
-      {!isOnline ? (
-        // Offline Pop-up (Toast-style)
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] animate-in slide-in-from-top-4 fade-in duration-300">
-          <div className="bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 w-full max-w-sm pointer-events-none">
+      <div className="pointer-events-auto">
+        {!isOnline ? (
+          <div className="bg-gray-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
             <div className="w-8 h-8 bg-red-500/20 rounded-xl flex items-center justify-center">
               <WifiOff className="w-4 h-4 text-red-400" />
             </div>
             <div className="text-left">
-              <p className="text-[11px] font-black uppercase tracking-widest leading-none">Offline Mode</p>
-              <p className="text-[9px] text-gray-400 font-bold mt-1">Actions will sync when back online</p>
+              <p className="text-[10px] font-black uppercase tracking-widest leading-none">Connection Offline</p>
+              <p className="text-[9px] text-gray-400 font-bold mt-1">Actions will queue locally</p>
             </div>
           </div>
-        </div>
-      ) : showLiveStatus ? (
-        // Temporary "Live Engine" Pop-up when reconnecting
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] animate-in slide-in-from-top-4 fade-in duration-300">
-          <div className="bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl border border-emerald-500 flex items-center gap-3">
+        ) : showLiveStatus ? (
+          <div className="bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl border border-emerald-500 flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
             <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-white" />
             </div>
             <div className="text-left">
-              <p className="text-[11px] font-black uppercase tracking-widest leading-none">Live Engine Active</p>
-              <p className="text-[9px] text-emerald-100 font-bold mt-1">Connection restored & synced</p>
+              <p className="text-[10px] font-black uppercase tracking-widest leading-none">Live Sync Restored</p>
+              <p className="text-[9px] text-emerald-100 font-bold mt-1">Matching engine is now active</p>
             </div>
           </div>
-        </div>
-      ) : (
-        // Inline indicator for syncing/pending within the Navbar flow
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-gray-100 bg-white shadow-sm transition-all animate-in fade-in zoom-in-95">
-          {isSyncing ? (
-            <div className="flex items-center gap-2 text-emerald-600 animate-pulse">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              <span>Syncing {pendingCount} actions</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-blue-600">
-              <Cloud className="w-3 h-3" />
-              <span>{pendingCount} Queued</span>
-            </div>
-          )}
-        </div>
-      )}
+        ) : (
+          <div className="bg-white/95 backdrop-blur-md border border-gray-100 px-4 py-2.5 rounded-full shadow-lg flex items-center justify-center gap-3 animate-in fade-in zoom-in-95 mx-auto w-fit">
+            {isSyncing ? (
+              <div className="flex items-center gap-2 text-emerald-600">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Syncing Data...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-blue-600">
+                <Cloud className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{pendingCount} Action{pendingCount > 1 ? 's' : ''} Queued</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { getRecommendations } from '../../services/matchingEngine.ts';
 import { SKILL_INDEX } from '../../constants.ts';
 import JobCard from '../../components/JobCard.tsx';
 import BottomNav, { NavTabId } from '../../components/BottomNav.tsx';
+import { useConnectivity } from '../../hooks/useConnectivity.ts';
 import { 
   LayoutDashboard, 
   User, 
@@ -31,7 +32,9 @@ import {
   Loader2,
   LogOut,
   ChevronRight,
-  Database
+  Database,
+  CloudOff,
+  ShieldAlert
 } from 'lucide-react';
 
 interface SeekerDashboardProps {
@@ -46,6 +49,7 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [storageUse, setStorageUse] = useState(0);
+  const { isOnline } = useConnectivity();
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -142,27 +146,47 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
       case 'OVERVIEW':
         return (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <header>
-              <h2 className="text-3xl font-black text-gray-900 leading-tight tracking-tight">Moni, {user.fullName.split(' ')[0]}!</h2>
-              <p className="text-gray-500 font-medium">Your career algorithm has matched {allMatches.length} opportunities today.</p>
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+              <div>
+                <h2 className="text-4xl font-black text-gray-900 leading-tight tracking-tight">Moni, {user.fullName.split(' ')[0]}!</h2>
+                <p className="text-gray-500 font-medium">Your career algorithm has matched {allMatches.length} opportunities today.</p>
+              </div>
+              
+              {/* DISCRETE OFFLINE STATUS BADGE */}
+              {!isOnline && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-2xl border border-amber-100 animate-in zoom-in-95">
+                  <CloudOff className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Offline Access Only</span>
+                </div>
+              )}
             </header>
 
+            {/* PLATFORM SCOPE NOTICE */}
+            <div className="p-5 bg-white rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+               <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                  <ShieldAlert className="w-5 h-5 text-emerald-600" />
+               </div>
+               <p className="text-[11px] font-bold text-gray-500">
+                  <span className="text-emerald-700 font-black">Platform Scope:</span> This platform connects users to on-site and location-based jobs. Remote work opportunities are not supported.
+               </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Match Confidence</p>
                 <h3 className="text-5xl font-black text-emerald-600">{(allMatches[0]?.scoreFinal * 100 || 0).toFixed(0)}%</h3>
                 <div className="w-full bg-gray-50 h-2 rounded-full overflow-hidden">
                   <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${(allMatches[0]?.scoreFinal * 100 || 0)}%` }}></div>
                 </div>
               </div>
-              <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Active Pipeline</p>
                 <h3 className="text-5xl font-black text-gray-900">{jobs.length.toLocaleString()}</h3>
                 <button onClick={() => setActiveTab('MATCHES')} className="flex items-center gap-1 text-xs font-black uppercase tracking-widest text-emerald-600 hover:underline text-left">
                   Browse Engine <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
-              <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-blue-200 transition-all">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-blue-200 transition-all">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Interests</p>
                 <h3 className="text-5xl font-black text-blue-600">{user.appliedJobIds.length}</h3>
                 <button onClick={() => setActiveTab('APPLICATIONS')} className="flex items-center gap-1 text-xs font-black uppercase tracking-widest text-blue-600 hover:underline text-left">

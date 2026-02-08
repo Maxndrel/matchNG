@@ -78,16 +78,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
     }));
   };
 
-  /**
-   * Google Authentication Logic
-   */
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setError('');
     
     try {
       await new Promise(r => setTimeout(r, 1200));
-      
       const users = await getUsers();
       const googleUserEmail = "user@gmail.com";
       const existing = users.find(u => u.fullName.toLowerCase().includes("google") && u.role === role);
@@ -158,7 +154,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
         if (user) {
           onAuthSuccess(user);
         } else {
-          setError(`Invalid credentials for ${role.toLowerCase()}. Please check your role or name.`);
+          setError(`Invalid credentials for ${role.toLowerCase()}.`);
         }
       }
     } catch (err) {
@@ -169,18 +165,18 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
   };
 
   const renderRoleToggle = () => (
-    <div className="bg-gray-100 p-1 rounded-2xl flex mb-6 relative">
+    <div className="bg-gray-100 p-1 rounded-2xl flex mb-6 relative select-none">
       <button 
         type="button"
         onClick={() => handleRoleSelect(UserRole.SEEKER)}
-        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all z-10 ${role === UserRole.SEEKER ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
+        className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all z-10 ${role === UserRole.SEEKER ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
       >
         <UserIcon className="w-3.5 h-3.5" /> Seeker
       </button>
       <button 
         type="button"
         onClick={() => handleRoleSelect(UserRole.EMPLOYER)}
-        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all z-10 ${role === UserRole.EMPLOYER ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
+        className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all z-10 ${role === UserRole.EMPLOYER ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
       >
         <Building className="w-3.5 h-3.5" /> Employer
       </button>
@@ -191,9 +187,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
   );
 
   const renderRoleSelector = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-black text-gray-900">Choose Your Path</h2>
+        <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Choose Your Path</h2>
         <p className="text-gray-500 text-sm font-medium">Select your role to unlock specialized tools.</p>
       </div>
       <div className="grid grid-cols-1 gap-4">
@@ -204,14 +200,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
           <button 
             key={r.id}
             onClick={() => handleRoleSelect(r.id)}
-            className={`p-6 rounded-[2rem] border-2 text-left transition-all flex items-center gap-6 group ${role === r.id ? 'border-emerald-600 bg-emerald-50 shadow-xl shadow-emerald-100' : 'border-gray-100 bg-white hover:border-emerald-200'}`}
+            className={`p-5 md:p-6 rounded-[2rem] border-2 text-left transition-all flex items-center gap-5 md:gap-6 group active:scale-[0.98] ${role === r.id ? 'border-emerald-600 bg-emerald-50 shadow-xl shadow-emerald-100' : 'border-gray-100 bg-white hover:border-emerald-200'}`}
           >
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${role === r.id ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
-              <r.icon className="w-7 h-7" />
+            <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-colors ${role === r.id ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+              <r.icon className="w-6 h-6 md:w-7 md:h-7" />
             </div>
             <div className="flex-grow">
-              <h4 className="font-black text-gray-900">{r.label}</h4>
-              <p className="text-xs text-gray-500 font-medium">{r.desc}</p>
+              <h4 className="font-black text-gray-900 text-base md:text-lg">{r.label}</h4>
+              <p className="text-[10px] md:text-xs text-gray-500 font-bold uppercase tracking-widest">{r.desc}</p>
             </div>
             <ArrowRight className={`w-5 h-5 transition-transform ${role === r.id ? 'text-emerald-600 translate-x-1' : 'text-gray-200 group-hover:translate-x-1'}`} />
           </button>
@@ -223,23 +219,21 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
   const renderCredentialsForm = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
       <div className="text-center mb-4">
-        <h2 className="text-2xl font-black text-gray-900">
+        <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
           {mode === 'LOGIN' ? 'Welcome Back' : 'Create Account'}
         </h2>
-        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mt-1">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 mt-2">
           {mode === 'LOGIN' ? 'Identify your role to continue' : `Joining as ${role.toLowerCase()}`}
         </p>
       </div>
 
       {mode === 'LOGIN' && renderRoleToggle()}
 
-      {/* Google Authentication Button */}
       <button 
         type="button"
         disabled={isLoading}
         onClick={handleGoogleSignIn}
-        aria-label="Continue with Google"
-        className="w-full py-4 px-6 bg-white border border-gray-200 rounded-2xl flex items-center justify-center gap-3 font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50"
+        className="w-full h-14 bg-white border border-gray-200 rounded-2xl flex items-center justify-center gap-3 font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -247,17 +241,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
           <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
         </svg>
-        {mode === 'LOGIN' ? 'Sign in with Google' : 'Join with Google'}
+        <span className="text-sm font-black uppercase tracking-widest">{mode === 'LOGIN' ? 'Google Login' : 'Join via Google'}</span>
       </button>
 
       <div className="flex items-center gap-4 py-2">
         <div className="h-px bg-gray-100 flex-grow" />
-        <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Or email/password</span>
+        <span className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em]">Or use Credentials</span>
         <div className="h-px bg-gray-100 flex-grow" />
       </div>
 
       <div className="space-y-4">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name / Identifier</label>
           <div className="relative">
             <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
@@ -267,14 +261,15 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
               required
               value={formData.fullName}
               onChange={handleInputChange}
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-900"
+              autoComplete="name"
+              className="w-full pl-12 pr-4 h-14 bg-gray-50 border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-900 text-base"
               placeholder={role === UserRole.SEEKER ? "e.g. Amina Garba" : "Admin Name"}
             />
           </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Security Key</label>
           <div className="relative">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
             <input 
@@ -283,13 +278,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
               required
               value={formData.password}
               onChange={handleInputChange}
-              className="w-full pl-12 pr-12 py-4 bg-gray-50 border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-900"
+              autoComplete="current-password"
+              className="w-full pl-12 pr-12 h-14 bg-gray-50 border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-gray-900 text-base"
               placeholder="••••••••"
             />
             <button 
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 p-2"
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
@@ -300,17 +296,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
       <button 
         type="submit"
         disabled={isLoading || formData.fullName.length < 2}
-        className="w-full py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.97]"
+        className="w-full h-16 bg-emerald-600 text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.97]"
       >
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mode === 'LOGIN' ? `Login as ${role.toLowerCase()}` : 'Continue'}
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mode === 'LOGIN' ? `Identify & Log In` : 'Continue Registration'}
       </button>
       
       {mode === 'REGISTER' && (
         <button 
           onClick={() => setSignupStep('ROLE')}
-          className="w-full flex items-center justify-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-600"
+          className="w-full flex items-center justify-center gap-2 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors"
         >
-          <ChevronLeft className="w-3 h-3" /> Re-select Role
+          <ChevronLeft className="w-3.5 h-3.5" /> Re-select Path
         </button>
       )}
     </div>
@@ -319,7 +315,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
   const renderProfileStep = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
       <div className="text-center">
-        <h2 className="text-2xl font-black text-gray-900">Finish Your Profile</h2>
+        <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Finish Your Profile</h2>
         <p className="text-gray-500 text-sm font-medium mt-1">Finalize your metadata for the matching algorithm.</p>
       </div>
 
@@ -335,7 +331,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
                   required
                   value={formData.companyName}
                   onChange={handleInputChange}
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border-transparent focus:bg-white focus:border-emerald-500 outline-none font-bold"
+                  className="w-full pl-12 pr-4 h-14 bg-gray-50 rounded-2xl border-transparent focus:bg-white focus:border-emerald-500 outline-none font-bold text-base"
                   placeholder="e.g. Sterling Bank Plc"
                  />
                </div>
@@ -346,7 +342,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
                 name="industry"
                 value={formData.industry}
                 onChange={handleInputChange}
-                className="w-full px-4 py-4 bg-gray-50 rounded-2xl border-transparent focus:bg-white focus:border-emerald-500 outline-none font-bold"
+                className="w-full px-4 h-14 bg-gray-50 rounded-2xl border-transparent focus:bg-white focus:border-emerald-500 outline-none font-bold text-base"
                >
                  {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
                </select>
@@ -354,14 +350,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
           </div>
         ) : (
           <div className="space-y-4">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select Your Expertise</label>
-            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pr-2 no-scrollbar">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select Expertise (Swipe)</label>
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-2 no-scrollbar">
               {SKILL_TAXONOMY.map(skill => (
                 <button
                   key={skill.id}
                   type="button"
                   onClick={() => toggleSkill(skill.id)}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${formData.selectedSkills.includes(skill.id) ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-gray-100 text-gray-500 hover:border-emerald-200'}`}
+                  className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all active:scale-[0.95] ${formData.selectedSkills.includes(skill.id) ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-gray-100 text-gray-500 hover:border-emerald-200'}`}
                 >
                   {skill.name}
                 </button>
@@ -370,14 +366,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">State</label>
             <select 
               name="state"
               value={formData.state}
               onChange={handleInputChange}
-              className="w-full px-4 py-4 bg-gray-50 rounded-2xl border-transparent outline-none font-bold"
+              className="w-full px-4 h-14 bg-gray-50 rounded-2xl border-transparent outline-none font-bold text-base"
             >
               {NIGERIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -389,7 +385,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
               required
               value={formData.city}
               onChange={handleInputChange}
-              className="w-full px-4 py-4 bg-gray-50 rounded-2xl border-transparent focus:bg-white focus:border-emerald-500 outline-none font-bold"
+              className="w-full px-4 h-14 bg-gray-50 rounded-2xl border-transparent focus:bg-white focus:border-emerald-500 outline-none font-bold text-base"
               placeholder="e.g. Maitama"
             />
           </div>
@@ -398,7 +394,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
         <button 
           type="submit"
           disabled={isLoading || formData.city.length < 2 || (role === UserRole.EMPLOYER && formData.companyName.length < 3)}
-          className="w-full py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+          className="w-full h-16 bg-emerald-600 text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-[0.97]"
         >
           {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Launch Dashboard'}
         </button>
@@ -407,26 +403,28 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50/50">
-      <div className="w-full max-w-[480px] bg-white rounded-[3rem] shadow-2xl shadow-emerald-900/10 border border-gray-50 overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-gray-50/50">
+      <div className="w-full max-w-[480px] bg-white rounded-[2.5rem] md:rounded-[3rem] shadow-2xl shadow-emerald-900/10 border border-gray-100 overflow-hidden relative">
         
-        {/* Branding */}
-        <div className="p-8 pb-0 flex flex-col items-center">
-          <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-emerald-200 mb-4 animate-in zoom-in duration-500">
+        {/* Decorative elements */}
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-600 to-teal-400"></div>
+
+        <div className="p-6 md:p-10 pb-0 flex flex-col items-center">
+          <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-emerald-100 mb-4 animate-in zoom-in duration-500">
             <Briefcase className="text-white w-7 h-7" />
           </div>
-          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.4em]">Auth Service v3</p>
+          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.5em] ml-[0.5em]">Auth Service</p>
         </div>
 
-        <div className="p-8 pt-6">
+        <div className="p-6 md:p-10 pt-6">
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 animate-in shake">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <p className="text-[10px] font-black uppercase tracking-widest">{error}</p>
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             {mode === 'LOGIN' ? renderCredentialsForm() : (
               <>
                 {signupStep === 'ROLE' && renderRoleSelector()}
@@ -436,7 +434,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
             )}
           </form>
 
-          {/* Mode Switcher */}
           {signupStep !== 'PROFILE' && (
              <div className="mt-8 text-center">
                <button 
@@ -446,23 +443,22 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
                   setSignupStep(nextMode === 'REGISTER' ? 'ROLE' : 'CREDENTIALS');
                   setError('');
                 }}
-                className="text-[11px] font-black text-gray-400 hover:text-emerald-600 transition-colors uppercase tracking-widest"
+                className="text-[11px] font-black text-gray-400 hover:text-emerald-600 transition-colors uppercase tracking-widest p-2"
                >
                  {mode === 'LOGIN' ? (
-                   <>New to matchNG? <span className="text-emerald-600 underline underline-offset-4">Join Now</span></>
+                   <>New to matchNG? <span className="text-emerald-600 underline underline-offset-4 decoration-2">Join Now</span></>
                  ) : (
-                   <>Already a member? <span className="text-emerald-600 underline underline-offset-4">Sign In</span></>
+                   <>Member? <span className="text-emerald-600 underline underline-offset-4 decoration-2">Sign In</span></>
                  )}
                </button>
              </div>
           )}
         </div>
 
-        {/* Footer info */}
-        <div className="px-10 py-6 bg-gray-50/50 border-t border-gray-100 text-center">
+        <div className="px-10 py-6 bg-gray-50/50 border-t border-gray-100 text-center select-none">
            <div className="flex items-center justify-center gap-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              Verified Multi-Factor Protocols Active
+              End-to-End Encryption Active
            </div>
         </div>
       </div>
