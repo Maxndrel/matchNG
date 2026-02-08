@@ -126,13 +126,43 @@ export const saveUser = (user: UserProfile) => {
 
 export const getJobs = (): Job[] => _cache.jobs;
 
+/**
+ * SCOPED ACCESS: Fetches only jobs belonging to a specific employer.
+ * In a real backend, this would be an indexed SQL query.
+ */
+export const getJobsByEmployer = (employerId: string): Job[] => {
+  return _cache.jobs.filter(j => j.employerId === employerId);
+};
+
 export const saveJob = (job: Job) => {
   _isInternalUpdate = true;
+  
+  // Ownership Guard: Prevent overwriting jobs belonging to others
+  const existing = _cache.jobs.find(j => j.id === job.id);
+  if (existing && existing.employerId !== job.employerId) {
+    console.error("Unauthorized: Employer does not own this job listing.");
+    _isInternalUpdate = false;
+    return;
+  }
+
   const idx = _cache.jobs.findIndex(j => j.id === job.id);
   if (idx > -1) _cache.jobs[idx] = { ...job };
   else _cache.jobs.push({ ...job });
   
   persist(KEYS.JOBS, _cache.jobs);
+  _isInternalUpdate = false;
+  notifyStorageChange();
+};
+
+export const deleteJob = (jobId: string, employerId: string) => {
+  _isInternalUpdate = true;
+  const job = _cache.jobs.find(j => j.id === jobId);
+  
+  if (job && job.employerId === employerId) {
+    _cache.jobs = _cache.jobs.filter(j => j.id !== jobId);
+    persist(KEYS.JOBS, _cache.jobs);
+  }
+  
   _isInternalUpdate = false;
   notifyStorageChange();
 };
