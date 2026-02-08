@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -26,30 +27,30 @@ const App: React.FC = () => {
     const handleSync = () => {
       if (typeof window === 'undefined') return;
       const session = getActiveUser();
-      if (JSON.stringify(session) !== JSON.stringify(activeUser)) {
+      // Use a more stable comparison
+      if (session?.id !== activeUser?.id) {
         setActiveUser(session);
       }
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage-sync', handleSync);
-      return () => window.removeEventListener('storage-sync', handleSync);
-    }
-  }, [activeUser]);
+    window.addEventListener('storage-sync', handleSync);
+    return () => window.removeEventListener('storage-sync', handleSync);
+  }, [activeUser?.id]);
 
   // Root Client-Only Hydration Hook
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
+    // 1. Initialize data layer
     initializeStorage();
+    
+    // 2. Hydrate session
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      // Auto-redirect to dashboard if session exists
-      if (currentPage === 'LANDING' || currentPage === 'LOGIN') {
-        setCurrentPage('DASHBOARD');
-      }
+      // Auto-redirect to dashboard if session exists and user is on entry pages
+      setCurrentPage(prev => (prev === 'LANDING' || prev === 'LOGIN' || prev === 'REGISTER') ? 'DASHBOARD' : prev);
     }
+    
+    // 3. Signal app is ready for client-side interaction
     setIsHydrated(true);
   }, []);
 
@@ -83,12 +84,30 @@ const App: React.FC = () => {
     }
   }, [currentPage, activeUser, isHydrated]);
 
-  // Ensure there's always a rendered tree during build/hydration
+  // Resilience: Show a visible loader if hydration is stuck
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">matchNG Engine Booting...</p>
+      <div style={{ 
+        minHeight: '100vh', 
+        backgroundColor: '#f9fafb', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        fontFamily: 'sans-serif'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          border: '4px solid #10b981',
+          borderTopColor: 'transparent',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}></div>
+        <p style={{ marginTop: '20px', color: '#6b7280', fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.1em' }}>
+          MATCHNG ENGINE BOOTING...
+        </p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -96,7 +115,7 @@ const App: React.FC = () => {
   const renderPage = () => {
     switch (currentPage) {
       case 'LANDING':
-        return <Landing onStart={(role) => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
+        return <Landing onStart={() => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
       case 'ABOUT':
         return <About />;
       case 'EMPLOYERS':
@@ -128,7 +147,7 @@ const App: React.FC = () => {
       onLogout={handleLogout}
       onNavigate={setCurrentPage}
     >
-      <div className="min-h-[65vh] fade-in">
+      <div className="fade-in">
         {renderPage()}
       </div>
     </Layout>
