@@ -1,14 +1,15 @@
+
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { UserProfile, Job, MatchResult } from '../../types';
-import Matches from './Matches';
-import Profile from './Profile';
-import { getJobs, saveUser, getActiveUser } from '../../services/storage';
-import { getRecommendations } from '../../services/matchingEngine';
-import { SKILL_INDEX } from '../../constants';
-import JobCard from '../../components/JobCard';
-import BottomNav, { NavTabId } from '../../components/BottomNav';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { UserProfile, Job, MatchResult } from '../../types.ts';
+import Matches from './Matches.tsx';
+import Profile from './Profile.tsx';
+import { getJobs, saveUser, getActiveUser, getStorageUsage } from '../../services/storage.ts';
+import { getRecommendations } from '../../services/matchingEngine.ts';
+import { SKILL_INDEX } from '../../constants.ts';
+import JobCard from '../../components/JobCard.tsx';
+import BottomNav, { NavTabId } from '../../components/BottomNav.tsx';
 import { 
   LayoutDashboard, 
   User, 
@@ -26,19 +27,45 @@ import {
   TrendingUp,
   Cpu,
   Sprout,
-  Sun
+  Sun,
+  Loader2,
+  LogOut,
+  ChevronRight,
+  Database
 } from 'lucide-react';
 
 interface SeekerDashboardProps {
   user: UserProfile;
   onUpdateUser: (updated: UserProfile) => void;
+  onLogout: () => void;
 }
 
-const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser }) => {
+const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, onLogout }) => {
   const [activeTab, setActiveTab] = useState<NavTabId>('OVERVIEW');
   const [isMounted, setIsMounted] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [storageUse, setStorageUse] = useState(0);
 
-  // Persistence logic for the active tab across refreshes
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await getJobs();
+      setJobs(data);
+      setStorageUse(getStorageUsage());
+    } catch (e) {
+      console.error("Failed to fetch jobs", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    window.addEventListener('storage-sync', fetchData);
+    return () => window.removeEventListener('storage-sync', fetchData);
+  }, [fetchData]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('matchNG_last_tab');
@@ -55,9 +82,8 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
     }
   }, [activeTab, isMounted]);
 
-  const jobs = useMemo(() => getJobs(), [user.id]);
-  
   const allMatches = useMemo(() => {
+    if (jobs.length === 0) return [];
     return getRecommendations(user, jobs);
   }, [user, jobs]);
 
@@ -82,16 +108,16 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
     return missing.map(sid => SKILL_INDEX.get(sid)).filter(Boolean);
   }, [allMatches, user.skills]);
 
-  const handleApply = (jobId: string) => {
+  const handleApply = async (jobId: string) => {
     if (user.appliedJobIds.includes(jobId)) return;
     const updatedUser = {
       ...user,
       appliedJobIds: [...user.appliedJobIds, jobId]
     };
-    onUpdateUser(updatedUser);
+    await onUpdateUser(updatedUser);
   };
 
-  const handleSave = (jobId: string) => {
+  const handleSave = async (jobId: string) => {
     const isSaved = user.savedJobIds.includes(jobId);
     const updatedUser = {
       ...user,
@@ -99,12 +125,16 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
         ? user.savedJobIds.filter(id => id !== jobId) 
         : [...user.savedJobIds, jobId]
     };
-    onUpdateUser(updatedUser);
+    await onUpdateUser(updatedUser);
   };
 
-  // Prevent UI flicker/mismatch during hydration
-  if (!isMounted) {
-    return <div className="min-h-[50vh] flex items-center justify-center"><div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div></div>;
+  if (!isMounted || isLoading) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Syncing with MatchNG Cloud...</p>
+      </div>
+    );
   }
 
   const renderContent = () => {
@@ -247,13 +277,33 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
 
       case 'SETTINGS':
         return (
-          <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in">
+          <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in pb-20">
              <header className="space-y-2">
                <h2 className="text-4xl font-black text-gray-900 tracking-tight">Settings</h2>
                <p className="text-gray-500 font-medium">Manage your notifications and account preferences.</p>
              </header>
 
              <div className="space-y-6">
+                <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
+                  <div className="flex items-center gap-3">
+                    <Database className="w-6 h-6 text-gray-900" />
+                    <h3 className="text-xl font-black uppercase tracking-tight">Data Footprint</h3>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-xs font-black uppercase tracking-widest text-gray-400 mb-1">
+                      <span>LocalStorage Usage</span>
+                      <span>{storageUse.toFixed(2)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden border border-gray-100">
+                      <div 
+                        className="bg-emerald-500 h-full transition-all duration-500" 
+                        style={{ width: `${storageUse}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-medium italic">Persistent storage ensures your drafts and matches are available even offline.</p>
+                  </div>
+                </div>
+
                 <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
                   <div className="flex items-center gap-3">
                     <Smartphone className="w-6 h-6 text-gray-900" />
@@ -266,18 +316,8 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
                         <p className="font-bold text-gray-900">SMS Matching Alerts</p>
                         <p className="text-xs text-gray-400 font-medium italic">Receive top 3 matches via SMS when offline.</p>
                       </div>
-                      <button className="w-12 h-6 bg-emerald-500 rounded-full p-1 flex items-center shadow-inner">
+                      <button className="w-12 h-6 bg-emerald-500 rounded-full p-1 flex items-center shadow-inner text-white">
                         <div className="w-4 h-4 bg-white rounded-full translate-x-6" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl opacity-50">
-                      <div>
-                        <p className="font-bold text-gray-900">USSD Session History</p>
-                        <p className="text-xs text-gray-400 font-medium italic">Log activity from *347*88# sessions.</p>
-                      </div>
-                      <button className="w-12 h-6 bg-gray-300 rounded-full p-1 flex items-center">
-                        <div className="w-4 h-4 bg-white rounded-full" />
                       </button>
                     </div>
                   </div>
@@ -293,9 +333,39 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
                     <CheckCircle className="w-4 h-4" /> GDPR / NDPR Compliant
                   </div>
                 </div>
+
+                <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
+                  <div className="flex items-center gap-3 text-red-600">
+                    <User className="w-6 h-6" />
+                    <h3 className="text-xl font-black uppercase tracking-tight">Account Management</h3>
+                  </div>
+                  <div className="pt-2">
+                    <button 
+                      onClick={onLogout}
+                      className="w-full flex items-center justify-between p-5 rounded-2xl border border-red-100 bg-red-50/30 text-red-600 hover:bg-red-50 transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <LogOut className="w-5 h-5" />
+                        <span className="font-black text-sm uppercase tracking-widest">Sign Out of matchNG</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (confirm("This will delete all locally saved data and drafts. Continue?")) {
+                          localStorage.clear();
+                          window.location.reload();
+                        }
+                      }}
+                      className="w-full mt-4 text-[10px] font-black text-gray-300 uppercase tracking-widest hover:text-red-400 transition-colors"
+                    >
+                      Purge Local Data Cache
+                    </button>
+                  </div>
+                </div>
              </div>
              
-             <button className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-black transition shadow-xl">Save Preferences</button>
+             <button className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-black transition shadow-xl">Save All Preferences</button>
           </div>
         );
 
@@ -319,15 +389,15 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
               <div className="grid gap-6">
                 {appliedJobs.map(match => (
                   <div key={match.job.id} className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 group hover:border-emerald-200 transition-colors">
-                    <div className="flex-grow space-y-2">
+                    <div className="flex-grow space-y-2 text-left w-full">
                       <h4 className="text-2xl font-black text-gray-900">{match.job.title}</h4>
                       <p className="text-gray-500 font-bold">{match.job.employerName} • {match.job.location.city}</p>
                       <div className="flex gap-4 pt-4">
                         <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest">Stage: Shortlisted</span>
-                        <span className="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-widest">Sent 2 days ago</span>
+                        <span className="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-widest">Sent recently</span>
                       </div>
                     </div>
-                    <button className="px-6 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm">View Status</button>
+                    <button className="w-full md:w-auto px-6 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm">View Status</button>
                   </div>
                 ))}
               </div>
@@ -343,12 +413,12 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
               <p className="text-gray-500 font-medium">Roles you bookmarked for later consideration.</p>
             </header>
             {savedJobs.length === 0 ? (
-              <div className="text-center py-32 bg-white rounded-[3rem] border border-gray-100 flex flex-col items-center">
+              <div className="text-center py-32 bg-white rounded-[3rem] border-gray-100 flex flex-col items-center">
                 <Star className="w-12 h-12 text-gray-100 mb-4" />
                 <p className="text-gray-400 font-black uppercase tracking-widest">No saved jobs yet</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                 {savedJobs.map(match => (
                   <JobCard 
                     key={match.job.id} 
@@ -371,7 +441,7 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
 
   return (
     <div className="relative pt-8 lg:pt-12 pb-32 min-h-screen">
-      <main className="min-w-0 max-w-5xl mx-auto">
+      <main className="min-w-0 max-w-5xl mx-auto px-4">
         {renderContent()}
       </main>
       <BottomNav activeTab={activeTab} onSelect={setActiveTab} />

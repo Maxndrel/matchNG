@@ -1,19 +1,51 @@
 
-import React, { useMemo } from 'react';
-import { TREND_DATA } from '../../constants';
-import { getUsers, getJobs } from '../../services/storage';
-import { UserRole } from '../../types';
+"use client";
+
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { TREND_DATA } from '../../constants.ts';
+import { getUsers, getJobs } from '../../services/storage.ts';
+import { UserRole, UserProfile, Job } from '../../types.ts';
+import { Loader2 } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
-  const users = useMemo(() => getUsers(), []);
-  const jobs = useMemo(() => getJobs(), []);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const seekerCount = users.filter(u => u.role === UserRole.SEEKER).length;
-  const employerCount = users.filter(u => u.role === UserRole.EMPLOYER).length;
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [allUsers, allJobs] = await Promise.all([getUsers(), getJobs()]);
+      setUsers(allUsers);
+      setJobs(allJobs);
+    } catch (e) {
+      console.error("Admin Dashboard failed to load metrics", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    window.addEventListener('storage-sync', fetchData);
+    return () => window.removeEventListener('storage-sync', fetchData);
+  }, [fetchData]);
+
+  const seekerCount = useMemo(() => users.filter(u => u.role === UserRole.SEEKER).length, [users]);
+  const employerCount = useMemo(() => users.filter(u => u.role === UserRole.EMPLOYER).length, [users]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
+        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Aggregating National Data...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="fade-in space-y-8">
-      <header className="flex justify-between items-center">
+    <div className="fade-in space-y-8 pb-32">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900">National Labor Dashboard</h1>
           <p className="text-gray-500 text-sm">Real-time matching trends and industry growth metrics.</p>
@@ -23,7 +55,7 @@ const AdminDashboard: React.FC = () => {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Registered Seekers', value: seekerCount, trend: '+12%', color: 'emerald' },
           { label: 'Active Job Posts', value: jobs.length, trend: '+5%', color: 'emerald' },
@@ -68,15 +100,15 @@ const AdminDashboard: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium">Auto-Skill Normalization</span>
-              <span className="w-10 h-6 bg-teal-500 rounded-full flex items-center px-1">
+              <div className="w-10 h-6 bg-teal-500 rounded-full flex items-center px-1">
                 <div className="w-4 h-4 bg-white rounded-full ml-auto shadow-sm"></div>
-              </span>
+              </div>
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium">Bias-Correction Algorithm</span>
-              <span className="w-10 h-6 bg-emerald-500 rounded-full flex items-center px-1">
+              <div className="w-10 h-6 bg-emerald-500 rounded-full flex items-center px-1">
                 <div className="w-4 h-4 bg-white rounded-full ml-auto shadow-sm"></div>
-              </span>
+              </div>
             </div>
           </div>
         </div>

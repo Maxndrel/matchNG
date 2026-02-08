@@ -6,6 +6,11 @@ import { UserRole, UserProfile } from '../../types.ts';
 import { getUsers, saveUser } from '../../services/storage.ts';
 import { Briefcase, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react';
 
+interface AuthPageProps {
+  initialMode: 'LOGIN' | 'REGISTER';
+  onAuthSuccess: (user: UserProfile) => void;
+}
+
 const GoogleIcon = () => (
   <svg className="w-5 h-5 mr-3 flex-shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path
@@ -30,18 +35,14 @@ const GoogleIcon = () => (
 const AuthPage: React.FC<AuthPageProps> = ({ initialMode, onAuthSuccess }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(initialMode);
   const [role, setRole] = useState<UserRole>(UserRole.SEEKER);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [isSimulatingGoogle, setIsSimulatingGoogle] = useState(false);
 
-  // handleSubmit is now async to handle storage calls
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    // getUsers() returns a Promise<UserProfile[]>
     const users = await getUsers();
 
     if (mode === 'REGISTER') {

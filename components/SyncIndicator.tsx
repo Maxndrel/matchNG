@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Cloud, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { getPendingActions, removePendingAction, saveUser, getActiveUser } from '../services/storage';
+import { getPendingActions, removePendingAction, saveUser, getActiveUser } from '../services/storage.ts';
 
 const SyncIndicator: React.FC = () => {
-  // SSR-safe default state
   const [isOnline, setIsOnline] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -12,15 +11,12 @@ const SyncIndicator: React.FC = () => {
   useEffect(() => {
     if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
 
-    // Set real status on mount
     setIsOnline(navigator.onLine);
 
-    const updateStatus = () => {
-      setIsOnline(navigator.onLine);
-    };
-
-    const updateQueue = () => {
-      setPendingCount(getPendingActions().length);
+    const updateStatus = () => setIsOnline(navigator.onLine);
+    const updateQueue = async () => {
+      const actions = await getPendingActions();
+      setPendingCount(actions.length);
     };
 
     window.addEventListener('online', updateStatus);
@@ -44,14 +40,15 @@ const SyncIndicator: React.FC = () => {
 
   const handleSync = async () => {
     setIsSyncing(true);
-    const actions = [...getPendingActions()];
+    const actions = await getPendingActions();
     
     for (const action of actions) {
       try {
-        await new Promise(r => setTimeout(r, 1000));
+        // Mocking network delay for the sync process
+        await new Promise(r => setTimeout(r, 800));
         const user = getActiveUser();
         if (!user) {
-          removePendingAction(action.id);
+          await removePendingAction(action.id);
           continue;
         }
 
@@ -59,7 +56,7 @@ const SyncIndicator: React.FC = () => {
           const jobId = action.payload.jobId;
           if (!user.appliedJobIds.includes(jobId)) {
             user.appliedJobIds.push(jobId);
-            saveUser(user);
+            await saveUser(user);
           }
         } else if (action.type === 'SAVE_JOB') {
           const jobId = action.payload.jobId;
@@ -69,9 +66,9 @@ const SyncIndicator: React.FC = () => {
           } else {
              user.savedJobIds.push(jobId);
           }
-          saveUser(user);
+          await saveUser(user);
         }
-        removePendingAction(action.id);
+        await removePendingAction(action.id);
       } catch (err) {
         console.error('Sync error:', err);
       }

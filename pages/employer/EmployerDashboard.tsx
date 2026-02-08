@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { UserProfile, Job, UserRole, ApplicationStatus, JobApplication, Notification } from '../../types';
+import { UserProfile, Job, UserRole, ApplicationStatus, JobApplication, Notification } from '../../types.ts';
 import { 
   getJobsByEmployer, 
   getUsers, 
@@ -11,10 +11,10 @@ import {
   getNotifications, 
   markNotifRead,
   saveJob
-} from '../../services/storage';
-import { computeCandidateMatch } from '../../services/matchingEngine';
-import { INDUSTRIES, SKILL_TAXONOMY, NIGERIA_STATES, SKILL_INDEX } from '../../constants';
-import EmployerBottomNav, { EmployerTabId } from '../../components/EmployerBottomNav';
+} from '../../services/storage.ts';
+import { computeCandidateMatch } from '../../services/matchingEngine.ts';
+import { INDUSTRIES, SKILL_TAXONOMY, NIGERIA_STATES, SKILL_INDEX } from '../../constants.ts';
+import EmployerBottomNav, { EmployerTabId } from '../../components/EmployerBottomNav.tsx';
 import { 
   PlusCircle, 
   Users, 
@@ -34,21 +34,26 @@ import {
   Save,
   Rocket,
   Bell,
-  CheckSquare
+  CheckSquare,
+  LogOut,
+  ChevronRight,
+  ShieldCheck,
+  Building
 } from 'lucide-react';
 
 interface EmployerDashboardProps {
   user: UserProfile;
   onUpdateUser: (updated: UserProfile) => void;
+  onLogout: () => void;
 }
 
 const QUICK_ACTIONS = [
   { id: 'POST_JOB', label: 'Create Listing', icon: PlusCircle, color: 'text-emerald-600' },
   { id: 'CANDIDATES', label: 'Review Matches', icon: Users, color: 'text-blue-600' },
-  { id: 'SETTINGS', label: 'Profile Settings', icon: Settings, color: 'text-gray-600' }
+  { id: 'SETTINGS', label: 'Dashboard Settings', icon: Settings, color: 'text-gray-600' }
 ];
 
-const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUser }) => {
+const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUser, onLogout }) => {
   const [activeTab, setActiveTab] = useState<EmployerTabId>('OVERVIEW');
   const [isMounted, setIsMounted] = useState(false);
 
@@ -77,11 +82,9 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     }
   }, []);
 
-  // refreshData is updated to handle asynchronous storage calls correctly
   const refreshData = useCallback(async () => {
     if (typeof window === 'undefined') return;
     
-    // Concurrently fetching all required dashboard data
     const [jobs, allUsers, apps, notes] = await Promise.all([
       getJobsByEmployer(user.id),
       getUsers(),
@@ -237,11 +240,64 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     </div>
   );
 
+  const renderSettings = () => (
+    <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in pb-32">
+       <header>
+          <h2 className="text-3xl font-black text-gray-900 leading-tight">Employer Settings</h2>
+          <p className="text-gray-500 font-medium">Manage your hiring workflow and corporate identity.</p>
+       </header>
+
+       <div className="space-y-6">
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-8">
+             <div className="flex items-center gap-3">
+                <Building className="w-6 h-6 text-emerald-600" />
+                <h3 className="text-xl font-black uppercase tracking-tight">Organization Profile</h3>
+             </div>
+             <p className="text-gray-500 text-sm italic">Hiring for <strong>{user.fullName}</strong>. Public profile is visible to all matched candidates.</p>
+             <button className="text-xs font-black text-emerald-600 uppercase tracking-widest border-b border-emerald-200">Edit Company Bio</button>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-8">
+             <div className="flex items-center gap-3">
+                <ShieldCheck className="w-6 h-6 text-emerald-600" />
+                <h3 className="text-xl font-black uppercase tracking-tight">Recruitment Security</h3>
+             </div>
+             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+               <div>
+                  <p className="font-bold text-gray-900">Anonymize Candidates</p>
+                  <p className="text-xs text-gray-400 italic">Hide names until shortlisting to prevent bias.</p>
+               </div>
+               <button className="w-12 h-6 bg-gray-200 rounded-full p-1 flex items-center shadow-inner">
+                  <div className="w-4 h-4 bg-white rounded-full" />
+               </button>
+             </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+             <div className="flex items-center gap-3 text-red-600">
+                <LogOut className="w-6 h-6" />
+                <h3 className="text-xl font-black uppercase tracking-tight">Session</h3>
+             </div>
+             <button 
+                onClick={onLogout}
+                className="w-full flex items-center justify-between p-5 rounded-2xl border border-red-100 bg-red-50/30 text-red-600 hover:bg-red-50 transition-all group"
+             >
+                <div className="flex items-center gap-3">
+                   <span className="font-black text-sm uppercase tracking-widest">Logout of Dashboard</span>
+                </div>
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+             </button>
+          </div>
+       </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 pt-8 lg:pt-16">
       <main className="max-w-6xl mx-auto px-4">
         {activeTab === 'OVERVIEW' && renderOverview()}
         {activeTab === 'APPLICATIONS' && renderApplications()}
+        {activeTab === 'SETTINGS' && renderSettings()}
         {activeTab === 'LISTINGS' && (
           <div className="space-y-8 animate-in fade-in pb-32">
              <header className="flex justify-between items-end">

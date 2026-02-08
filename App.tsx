@@ -13,50 +13,31 @@ import About from './pages/info/About.tsx';
 import EmployersInfo from './pages/info/EmployersInfo.tsx';
 import Training from './pages/info/Training.tsx';
 import Contact from './pages/info/Contact.tsx';
-import { initializeStorage, getActiveUser, setActiveUser as setStorageActiveUser, saveUser } from './services/storage.ts';
+import { initializeStorage, saveUser, getActiveUser, setActiveUser } from './services/storage.ts';
+import { usePersistentState } from './hooks/usePersistentState.ts';
 
 type Page = 'LANDING' | 'DASHBOARD' | 'ADMIN' | 'LOGIN' | 'REGISTER' | 'ABOUT' | 'EMPLOYERS' | 'TRAINING' | 'CONTACT';
 
 const App: React.FC = () => {
-  const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
+  // Use persistent state for the core session
+  const [activeUser, setActiveUserInternal] = usePersistentState<UserProfile | null>('session', null);
   const [currentPage, setCurrentPage] = useState<Page>('LANDING');
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Synchronize internal state with storage service notifications
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const handleSync = () => {
-      const session = getActiveUser();
-      if (session?.id !== activeUser?.id) {
-        setActiveUser(session);
-      }
-    };
-
-    window.addEventListener('storage-sync', handleSync);
-    return () => window.removeEventListener('storage-sync', handleSync);
-  }, [activeUser?.id]);
-
-  // Root Initialization - Runs only once on mount
   useEffect(() => {
     const init = async () => {
       if (typeof window === 'undefined') return;
 
-      // 1. Setup local storage and initial data (Simulated DB connection)
       await initializeStorage();
       
-      // 2. Hydrate session state
       const session = getActiveUser();
       if (session) {
-        setActiveUser(session);
-        // Auto-redirect to dashboard if user hits root pages with an active session
+        setActiveUserInternal(session);
         setCurrentPage(prev => (prev === 'LANDING' || prev === 'LOGIN' || prev === 'REGISTER') ? 'DASHBOARD' : prev);
       }
       
-      // 3. Mark app as ready
       setIsHydrated(true);
 
-      // Remove the static fallback loader from index.html
       const loader = document.getElementById('loader');
       if (loader) {
         loader.style.opacity = '0';
@@ -65,27 +46,26 @@ const App: React.FC = () => {
     };
 
     init();
-  }, []);
+  }, [setActiveUserInternal]);
 
   const handleAuthSuccess = async (user: UserProfile) => {
     await saveUser(user);
-    setStorageActiveUser(user);
     setActiveUser(user);
+    setActiveUserInternal(user);
     setCurrentPage('DASHBOARD');
   };
 
   const handleLogout = () => {
-    setStorageActiveUser(null);
     setActiveUser(null);
+    setActiveUserInternal(null);
     setCurrentPage('LANDING');
   };
 
   const handleUpdateUser = useCallback(async (updated: UserProfile) => {
     await saveUser(updated);
-    setActiveUser(updated);
-  }, []);
+    setActiveUserInternal(updated);
+  }, [setActiveUserInternal]);
 
-  // Protected route logic
   useEffect(() => {
     if (!isHydrated) return;
     const isProtectedRoute = currentPage === 'DASHBOARD' || currentPage === 'ADMIN';
@@ -117,8 +97,8 @@ const App: React.FC = () => {
       case 'DASHBOARD':
         if (!activeUser) return <Landing onStart={() => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
         return activeUser.role === UserRole.SEEKER 
-          ? <SeekerDashboard user={activeUser} onUpdateUser={handleUpdateUser} />
-          : <EmployerDashboard user={activeUser} onUpdateUser={handleUpdateUser} />;
+          ? <SeekerDashboard user={activeUser} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />
+          : <EmployerDashboard user={activeUser} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />;
       case 'ADMIN':
         return activeUser?.role === UserRole.ADMIN ? <AdminDashboard /> : <Landing onStart={() => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
       default:
