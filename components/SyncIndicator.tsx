@@ -4,11 +4,17 @@ import { Cloud, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { getPendingActions, removePendingAction, saveUser, getActiveUser } from '../services/storage';
 
 const SyncIndicator: React.FC = () => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  // SSR-safe default state
+  const [isOnline, setIsOnline] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+
+    // Set real status on mount
+    setIsOnline(navigator.onLine);
+
     const updateStatus = () => {
       setIsOnline(navigator.onLine);
     };
@@ -30,23 +36,19 @@ const SyncIndicator: React.FC = () => {
     };
   }, []);
 
-  // Background Sync Logic
   useEffect(() => {
     if (isOnline && pendingCount > 0 && !isSyncing) {
       handleSync();
     }
-  }, [isOnline, pendingCount]);
+  }, [isOnline, pendingCount, isSyncing]);
 
   const handleSync = async () => {
     setIsSyncing(true);
     const actions = [...getPendingActions()];
     
-    // Process actions sequentially to maintain order
     for (const action of actions) {
       try {
-        // Simulate network delay
         await new Promise(r => setTimeout(r, 1000));
-
         const user = getActiveUser();
         if (!user) {
           removePendingAction(action.id);
@@ -69,13 +71,11 @@ const SyncIndicator: React.FC = () => {
           }
           saveUser(user);
         }
-
         removePendingAction(action.id);
       } catch (err) {
         console.error('Sync error:', err);
       }
     }
-    
     setIsSyncing(false);
   };
 

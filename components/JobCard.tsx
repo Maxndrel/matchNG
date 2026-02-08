@@ -16,16 +16,20 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
   const { job, scoreSkill, scoreLocation, scoreTrend, scoreFinal } = match;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  // Default to true for SSR safety; will correct on mount
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    const handleStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', handleStatus);
-    window.addEventListener('offline', handleStatus);
-    return () => {
-      window.removeEventListener('online', handleStatus);
-      window.removeEventListener('offline', handleStatus);
-    };
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+      setIsOnline(navigator.onLine);
+      const handleStatus = () => setIsOnline(navigator.onLine);
+      window.addEventListener('online', handleStatus);
+      window.addEventListener('offline', handleStatus);
+      return () => {
+        window.removeEventListener('online', handleStatus);
+        window.removeEventListener('offline', handleStatus);
+      };
+    }
   }, []);
 
   useEffect(() => {
@@ -59,7 +63,6 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     setIsProcessing(true);
     await new Promise(resolve => setTimeout(resolve, 600));
 
-    // Create formal application record
     saveApplication({
       id: `app-${Date.now()}`,
       jobId: job.id,
@@ -87,12 +90,6 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     onSave(job.id);
     setFeedback(!isSaved ? 'Job Bookmarked!' : 'Removed Bookmark');
   }, [job.id, onSave, isSaved, isOnline]);
-
-  const getScoreColor = (score: number) => {
-    if (score > 0.8) return 'text-emerald-600';
-    if (score > 0.5) return 'text-yellow-600';
-    return 'text-red-600';
-  };
 
   return (
     <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:border-emerald-100 transition-all duration-500 overflow-hidden flex flex-col group h-full relative">

@@ -22,8 +22,10 @@ const _cache = {
   isLoaded: false
 };
 
-// Strict environment check
-const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+// Comprehensive browser check
+const isBrowser = typeof window !== 'undefined' && 
+                  typeof localStorage !== 'undefined' && 
+                  typeof navigator !== 'undefined';
 
 const safeGet = (key: string): any | null => {
   if (!isBrowser) return null;
@@ -40,7 +42,7 @@ const safeSet = (key: string, data: any) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
-    // Fail silently to prevent server hang
+    // Fail silently
   }
 };
 
@@ -48,7 +50,6 @@ let _isInternalUpdate = false;
 
 const notifyStorageChange = () => {
   if (_isInternalUpdate || !isBrowser) return;
-  // Use requestAnimationFrame to prevent event flooding
   window.requestAnimationFrame(() => {
     window.dispatchEvent(new Event('storage-sync'));
   });
