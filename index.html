@@ -1,15 +1,33 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>matchNG - Smart Job Matching for Nigeria</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    /* Low bandwidth optimizations - subtle animations only */
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
 <script type="importmap">
 {
   "imports": {
-    "next/": "https://esm.sh/next@^16.1.6/",
     "react/": "https://esm.sh/react@^19.2.4/",
     "react": "https://esm.sh/react@^19.2.4",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "next/": "https://esm.sh/next@^16.1.6/"
   }
 }
 </script>
-
-<!-- 
-  This file is deprecated and ignored by the Next.js build system. 
-  The entry point is managed by pages/index.tsx and pages/_document.tsx.
--->
+</head>
+<body class="bg-gray-50 text-gray-900 overflow-x-hidden">
+  <div id="root"></div>
+</body>
+</html>

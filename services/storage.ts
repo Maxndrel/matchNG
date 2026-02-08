@@ -1,3 +1,4 @@
+
 import { UserProfile, Job, UserRole, IndustryTrend, PendingAction, JobApplication, Notification, ApplicationStatus } from '../types';
 import { MOCK_SEEKER, MOCK_EMPLOYER } from './mockData';
 import { TREND_DATA, SKILL_TAXONOMY, NIGERIA_STATES, INDUSTRIES } from '../constants';
@@ -21,7 +22,7 @@ const _cache = {
   isLoaded: false
 };
 
-const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+const isBrowser = typeof window !== 'undefined';
 
 const safeGet = (key: string): any | null => {
   if (!isBrowser) return null;
@@ -128,11 +129,13 @@ export const markNotifRead = (id: string) => {
 
 export const getUsers = (): UserProfile[] => {
   if (!isBrowser) return [];
+  if (!_cache.isLoaded) initializeStorage();
   return _cache.users;
 };
 
 export const getJobs = (): Job[] => {
   if (!isBrowser) return [];
+  if (!_cache.isLoaded) initializeStorage();
   return _cache.jobs;
 };
 
