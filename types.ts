@@ -17,12 +17,6 @@ export interface Experience {
   duration: string;
 }
 
-export interface Skill {
-  id: string;
-  name: string;
-  category: string;
-}
-
 export interface Location {
   state: string;
   lga: string;
@@ -36,6 +30,13 @@ export interface IndustryTrend {
   growthRate: number;
   avgSkillDemand: number;
   trendScore: number;
+}
+
+// Added Skill interface
+export interface Skill {
+  id: string;
+  name: string;
+  category: string;
 }
 
 export interface UserProfile {
@@ -83,4 +84,15 @@ export interface CandidateResult {
   scoreLocation: number;
   scoreTrend: number;
   scoreFinal: number;
+}
+
+// Offline Action Queue Types
+export type ActionType = 'APPLY' | 'SAVE_JOB' | 'UPDATE_PROFILE';
+
+export interface PendingAction {
+  id: string;
+  type: ActionType;
+  payload: any;
+  timestamp: number;
+  retryCount: number;
 }

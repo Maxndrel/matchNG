@@ -7,7 +7,7 @@ import { getJobs, saveUser, getActiveUser } from '../../services/storage';
 import { getRecommendations } from '../../services/matchingEngine';
 import { SKILL_INDEX } from '../../constants';
 import JobCard from '../../components/JobCard';
-import SecondaryNav, { NavItem } from '../../components/SecondaryNav';
+import BottomNav, { NavTabId } from '../../components/BottomNav';
 import { 
   LayoutDashboard, 
   User, 
@@ -33,15 +33,18 @@ interface SeekerDashboardProps {
   onUpdateUser: (updated: UserProfile) => void;
 }
 
-type Tab = 'OVERVIEW' | 'PROFILE' | 'MATCHES' | 'APPLICATIONS' | 'SAVED' | 'TRAINING' | 'SETTINGS';
-
 const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW');
+  // Persistence logic for the active tab across refreshes
+  const [activeTab, setActiveTab] = useState<NavTabId>(() => {
+    const saved = localStorage.getItem('matchNG_last_tab');
+    return (saved as NavTabId) || 'OVERVIEW';
+  });
 
-  // Removed local syncKey and storage-sync listener that caused the loop.
-  // We now rely on the 'user' prop being updated by the parent App component.
+  useEffect(() => {
+    localStorage.setItem('matchNG_last_tab', activeTab);
+  }, [activeTab]);
 
-  const jobs = useMemo(() => getJobs(), [user.id]); // Re-fetch only if user context changes fundamentally
+  const jobs = useMemo(() => getJobs(), [user.id]);
   
   const allMatches = useMemo(() => {
     return getRecommendations(user, jobs);
@@ -55,7 +58,6 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
     return allMatches.filter(m => user.appliedJobIds.includes(m.job.id));
   }, [allMatches, user.appliedJobIds]);
 
-  // Skill gap analysis
   const skillGaps = useMemo(() => {
     const topSkillsInMatches = new Set<string>();
     const count = Math.min(10, allMatches.length);
@@ -68,16 +70,6 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
     const missing = Array.from(topSkillsInMatches).filter(s => !user.skills.includes(s));
     return missing.map(sid => SKILL_INDEX.get(sid)).filter(Boolean);
   }, [allMatches, user.skills]);
-
-  const navItems: NavItem[] = [
-    { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard },
-    { id: 'PROFILE', label: 'Profile', icon: User },
-    { id: 'MATCHES', label: 'Matches', icon: Target },
-    { id: 'APPLICATIONS', label: 'Apps', icon: FileText },
-    { id: 'SAVED', label: 'Saved', icon: Star },
-    { id: 'TRAINING', label: 'Training', icon: GraduationCap },
-    { id: 'SETTINGS', label: 'Settings', icon: Settings },
-  ];
 
   const handleApply = (jobId: string) => {
     if (user.appliedJobIds.includes(jobId)) return;
@@ -362,9 +354,11 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser })
   };
 
   return (
-    <div className="relative pt-8 lg:pt-16 pb-24 lg:pb-0">
-      <SecondaryNav items={navItems} activeId={activeTab} onSelect={setActiveTab} />
-      <main className="min-w-0">{renderContent()}</main>
+    <div className="relative pt-8 lg:pt-12 pb-32 min-h-screen">
+      <main className="min-w-0 max-w-5xl mx-auto">
+        {renderContent()}
+      </main>
+      <BottomNav activeTab={activeTab} onSelect={setActiveTab} />
     </div>
   );
 };

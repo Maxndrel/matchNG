@@ -1,5 +1,5 @@
 
-import { UserProfile, Job, UserRole, IndustryTrend } from '../types';
+import { UserProfile, Job, UserRole, IndustryTrend, PendingAction } from '../types';
 import { MOCK_SEEKER, MOCK_EMPLOYER } from './mockData';
 import { TREND_DATA, SKILL_TAXONOMY, NIGERIA_STATES, INDUSTRIES } from '../constants';
 
@@ -7,17 +7,17 @@ const KEYS = {
   USERS: 'matchNG_users_v1',
   JOBS: 'matchNG_jobs_v1',
   ACTIVE_USER: 'matchNG_session_v1',
-  TRENDS: 'matchNG_trends_v1'
+  QUEUE: 'matchNG_pending_actions_v1'
 };
 
 const _cache = {
   users: [] as UserProfile[],
   jobs: [] as Job[],
   activeUser: null as UserProfile | null,
+  queue: [] as PendingAction[],
   isLoaded: false
 };
 
-// Internal utility to prevent infinite event loops
 let _isInternalUpdate = false;
 
 const notifyStorageChange = () => {
@@ -39,10 +39,12 @@ export const initializeStorage = () => {
   const rawUsers = localStorage.getItem(KEYS.USERS);
   const rawJobs = localStorage.getItem(KEYS.JOBS);
   const rawActive = localStorage.getItem(KEYS.ACTIVE_USER);
+  const rawQueue = localStorage.getItem(KEYS.QUEUE);
 
   _cache.users = rawUsers ? JSON.parse(rawUsers) : [MOCK_SEEKER, MOCK_EMPLOYER];
   _cache.jobs = rawJobs ? JSON.parse(rawJobs) : generateMockJobs(100);
   _cache.activeUser = rawActive ? JSON.parse(rawActive) : null;
+  _cache.queue = rawQueue ? JSON.parse(rawQueue) : [];
 
   if (!rawUsers) persist(KEYS.USERS, _cache.users);
   if (!rawJobs) persist(KEYS.JOBS, _cache.jobs);
@@ -78,20 +80,41 @@ const generateMockJobs = (count: number): Job[] => {
   }));
 };
 
+// --- QUEUE MANAGEMENT ---
+
+export const getPendingActions = (): PendingAction[] => _cache.queue;
+
+export const addPendingAction = (action: Omit<PendingAction, 'id' | 'timestamp' | 'retryCount'>) => {
+  const newAction: PendingAction = {
+    ...action,
+    id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: Date.now(),
+    retryCount: 0
+  };
+  _cache.queue.push(newAction);
+  persist(KEYS.QUEUE, _cache.queue);
+  notifyStorageChange();
+  return newAction;
+};
+
+export const removePendingAction = (id: string) => {
+  _cache.queue = _cache.queue.filter(a => a.id !== id);
+  persist(KEYS.QUEUE, _cache.queue);
+  notifyStorageChange();
+};
+
+// --- DATA ACCESS ---
+
 export const getUsers = (): UserProfile[] => _cache.users;
 
 export const saveUser = (user: UserProfile) => {
   _isInternalUpdate = true;
   const idx = _cache.users.findIndex(u => u.id === user.id);
-  if (idx > -1) {
-    _cache.users[idx] = { ...user };
-  } else {
-    _cache.users.push({ ...user });
-  }
+  if (idx > -1) _cache.users[idx] = { ...user };
+  else _cache.users.push({ ...user });
   
   persist(KEYS.USERS, _cache.users);
   
-  // If we are saving the currently active user, update that pointer too
   if (_cache.activeUser?.id === user.id) {
     _cache.activeUser = { ...user };
     persist(KEYS.ACTIVE_USER, user);
@@ -115,7 +138,6 @@ export const saveJob = (job: Job) => {
 };
 
 export const getActiveUser = (): UserProfile | null => {
-  // Always verify cache against disk if possible for cross-tab sync
   const rawActive = localStorage.getItem(KEYS.ACTIVE_USER);
   if (rawActive) {
     const parsed = JSON.parse(rawActive);
@@ -129,18 +151,8 @@ export const getActiveUser = (): UserProfile | null => {
 export const setActiveUser = (user: UserProfile | null) => {
   _isInternalUpdate = true;
   _cache.activeUser = user ? { ...user } : null;
-  if (user) {
-    persist(KEYS.ACTIVE_USER, user);
-  } else {
-    localStorage.removeItem(KEYS.ACTIVE_USER);
-  }
+  if (user) persist(KEYS.ACTIVE_USER, user);
+  else localStorage.removeItem(KEYS.ACTIVE_USER);
   _isInternalUpdate = false;
   notifyStorageChange();
-};
-
-export const resetSystem = () => {
-  localStorage.clear();
-  _cache.isLoaded = false;
-  initializeStorage();
-  window.location.reload();
 };

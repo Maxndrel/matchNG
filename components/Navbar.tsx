@@ -2,6 +2,7 @@
 import React from 'react';
 import { UserRole } from '../types';
 import { Briefcase, LogOut, User, Menu } from 'lucide-react';
+import SyncIndicator from './SyncIndicator';
 
 interface NavbarProps {
   role?: string;
@@ -57,7 +58,9 @@ const Navbar: React.FC<NavbarProps> = ({ role, userName, onLogout, onNavigate })
           )}
         </div>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-4">
+          <SyncIndicator />
+          <div className="w-px h-6 bg-gray-200 hidden sm:block"></div>
           {role ? (
             <div className="flex items-center space-x-4">
               <div className="flex items-center gap-3">

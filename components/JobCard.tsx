@@ -2,7 +2,9 @@
 import React, { useState, useEffect, memo, useCallback } from 'react';
 import { MatchResult } from '../types';
 import { SKILL_INDEX } from '../constants';
-import { MapPin, Globe, Banknote, Star, CheckCircle2, Loader2 } from 'lucide-react';
+// Added RefreshCw to imports
+import { MapPin, Globe, Banknote, Star, CheckCircle2, Loader2, Cloud, RefreshCw } from 'lucide-react';
+import { addPendingAction } from '../services/storage';
 
 interface JobCardProps {
   match: MatchResult;
@@ -12,18 +14,22 @@ interface JobCardProps {
   isSaved?: boolean;
 }
 
-/**
- * Optimized JobCard Component
- * - Wrapped in React.memo to prevent re-renders unless props change.
- * - Uses useCallback for event handlers to maintain reference stability.
- * - Optimized skill lookups via SKILL_INDEX Map.
- */
 const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplied, isSaved }) => {
   const { job, scoreSkill, scoreLocation, scoreTrend, scoreFinal } = match;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Effect for clearing feedback with cleanup to prevent memory leaks
+  useEffect(() => {
+    const handleStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleStatus);
+    window.addEventListener('offline', handleStatus);
+    return () => {
+      window.removeEventListener('online', handleStatus);
+      window.removeEventListener('offline', handleStatus);
+    };
+  }, []);
+
   useEffect(() => {
     if (!feedback) return;
     const timer = setTimeout(() => setFeedback(null), 3000);
@@ -34,22 +40,33 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     e.stopPropagation();
     if (isApplied || isProcessing) return;
 
+    if (!isOnline) {
+      addPendingAction({ type: 'APPLY', payload: { jobId: job.id } });
+      setFeedback('Offline: Application Queued');
+      // Force local optimistic update
+      onApply(job.id);
+      return;
+    }
+
     setIsProcessing(true);
-    // Micro-delay for UI responsiveness feel (optimistic UI update could be faster, but this ensures state catch-up)
     await new Promise(resolve => setTimeout(resolve, 400));
     onApply(job.id);
     setFeedback('Application Sent!');
     setIsProcessing(false);
-  }, [isApplied, isProcessing, job.id, onApply]);
+  }, [isApplied, isProcessing, job.id, onApply, isOnline]);
 
   const handleSaveClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isOnline) {
+      addPendingAction({ type: 'SAVE_JOB', payload: { jobId: job.id } });
+      setFeedback('Offline: Bookmark Queued');
+      onSave(job.id);
+      return;
+    }
     onSave(job.id);
-    // Feedback text based on next state
     setFeedback(!isSaved ? 'Job Bookmarked!' : 'Removed Bookmark');
-  }, [job.id, onSave, isSaved]);
+  }, [job.id, onSave, isSaved, isOnline]);
 
-  // Pure styling helpers - kept outside render scope for cleanliness
   const getScoreColor = (score: number) => {
     if (score > 0.8) return 'text-emerald-600';
     if (score > 0.5) return 'text-yellow-600';
@@ -64,11 +81,10 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
 
   return (
     <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:border-emerald-100 transition-all duration-500 overflow-hidden flex flex-col group h-full relative will-change-transform">
-      {/* Visual Feedback Toast */}
       {feedback && (
         <div className="absolute top-4 left-4 right-4 z-20 animate-in slide-in-from-top-2 fade-in duration-300 pointer-events-none">
           <div className="bg-gray-900/95 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3 border border-white/10">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            {!isOnline ? <Cloud className="w-4 h-4 text-blue-400" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
             <span className="text-[11px] font-black uppercase tracking-tight">{feedback}</span>
           </div>
         </div>
@@ -80,8 +96,9 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">{job.industry}</span>
               {isApplied && (
-                <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Applied
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md flex items-center gap-1 ${!isOnline ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
+                  {isOnline ? <CheckCircle2 className="w-3 h-3" /> : <RefreshCw className="w-3 h-3 animate-spin" />}
+                  {isOnline ? 'Applied' : 'Syncing'}
                 </span>
               )}
             </div>
@@ -103,12 +120,6 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
             <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100">
                <Globe className="w-3.5 h-3.5 text-blue-600" />
                <span className="text-xs font-bold text-blue-700 uppercase tracking-tighter">Remote</span>
-            </div>
-          )}
-          {job.salaryRange && (
-            <div className="flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
-               <Banknote className="w-3.5 h-3.5 text-emerald-600" />
-               <span className="text-xs font-bold text-emerald-700">{job.salaryRange}</span>
             </div>
           )}
         </div>
@@ -156,7 +167,6 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
               ? 'text-yellow-500 border-yellow-200 bg-yellow-50 hover:bg-yellow-100' 
               : 'text-gray-300 border-gray-200 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50'
           }`}
-          title={isSaved ? "Remove from saved" : "Save for later"}
         >
           <Star className={`w-5 h-5 transition-all duration-300 ${isSaved ? 'fill-current scale-110' : 'group-hover:scale-110'}`} />
         </button>
@@ -164,7 +174,6 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     </div>
   );
 }, (prev, next) => {
-  // Custom equality check: only re-render if fundamental properties change
   return (
     prev.isApplied === next.isApplied &&
     prev.isSaved === next.isSaved &&
@@ -172,7 +181,5 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     prev.match.scoreFinal === next.match.scoreFinal
   );
 });
-
-JobCard.displayName = 'JobCard';
 
 export default JobCard;
