@@ -18,10 +18,9 @@ type Page = 'LANDING' | 'DASHBOARD' | 'ADMIN' | 'LOGIN' | 'REGISTER' | 'ABOUT' |
 const App: React.FC = () => {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('LANDING');
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // Central Sync Listener: This is the ONLY place that should react to 'storage-sync'
-  // to prevent circular dependency crashes.
+  // Synchronize internal state with storage service notifications
   useEffect(() => {
     const handleSync = () => {
       const session = getActiveUser();
@@ -34,17 +33,20 @@ const App: React.FC = () => {
     return () => window.removeEventListener('storage-sync', handleSync);
   }, [activeUser]);
 
+  // Root Client-Only Hydration Hook
   useEffect(() => {
+    // 1. Initialize data store only on client mount
     initializeStorage();
+    
+    // 2. Fetch session
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      // Ensure we stay on dashboard if logged in
-      if (currentPage === 'LANDING' || currentPage === 'LOGIN' || currentPage === 'REGISTER') {
-        setCurrentPage('DASHBOARD');
-      }
+      setCurrentPage('DASHBOARD');
     }
-    setIsInitialized(true);
+    
+    // 3. Mark app as hydrated to safely render client-only content
+    setIsHydrated(true);
   }, []);
 
   const handleAuthSuccess = (user: UserProfile) => {
@@ -61,13 +63,13 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUser = useCallback((updated: UserProfile) => {
-    // Standard data flow: update storage, wait for storage-sync or manual state update
     saveUser(updated);
     setActiveUser(updated);
   }, []);
 
+  // Guard navigation logic: wait for hydration
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isHydrated) return;
 
     const isDashboardRoute = currentPage === 'DASHBOARD';
     const isAdminRoute = currentPage === 'ADMIN';
@@ -80,9 +82,16 @@ const App: React.FC = () => {
     if (isAdminRoute && activeUser?.role !== UserRole.ADMIN) {
       setCurrentPage('LANDING');
     }
-  }, [currentPage, activeUser, isInitialized]);
+  }, [currentPage, activeUser, isHydrated]);
 
-  if (!isInitialized) return null;
+  // Render a minimal layout or loader until the client state is hydrated
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   const renderPage = () => {
     switch (currentPage) {

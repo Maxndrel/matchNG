@@ -48,10 +48,9 @@ const QUICK_ACTIONS = [
 ];
 
 const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUser }) => {
-  const [activeTab, setActiveTab] = useState<EmployerTabId>(() => {
-    const saved = localStorage.getItem('matchNG_employer_tab');
-    return (saved as EmployerTabId) || 'OVERVIEW';
-  });
+  // Initialize with default, populate from storage in useEffect
+  const [activeTab, setActiveTab] = useState<EmployerTabId>('OVERVIEW');
+  const [isMounted, setIsMounted] = useState(false);
 
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [seekers, setSeekers] = useState<UserProfile[]>([]);
@@ -69,6 +68,13 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     isRemote: false, status: 'OPEN'
   });
 
+  // Client-only hydration for tab state
+  useEffect(() => {
+    const saved = localStorage.getItem('matchNG_employer_tab');
+    if (saved) setActiveTab(saved as EmployerTabId);
+    setIsMounted(true);
+  }, []);
+
   const refreshData = useCallback(() => {
     setAllJobs(getJobsByEmployer(user.id));
     setSeekers(getUsers().filter(u => u.role === UserRole.SEEKER));
@@ -81,6 +87,12 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     window.addEventListener('storage-sync', refreshData);
     return () => window.removeEventListener('storage-sync', refreshData);
   }, [refreshData]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('matchNG_employer_tab', activeTab);
+    }
+  }, [activeTab, isMounted]);
 
   const unreadCount = useMemo(() => notifications.filter(n => !n.isRead).length, [notifications]);
 

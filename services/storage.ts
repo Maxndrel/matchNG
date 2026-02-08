@@ -22,44 +22,50 @@ const _cache = {
   isLoaded: false
 };
 
-let _isInternalUpdate = false;
+const isBrowser = typeof window !== 'undefined';
 
-const notifyStorageChange = () => {
-  if (_isInternalUpdate) return;
-  window.dispatchEvent(new Event('storage-sync'));
-};
-
-const persist = (key: string, data: any) => {
+const safeGet = (key: string): any | null => {
+  if (!isBrowser) return null;
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
   } catch (e) {
-    console.error('matchNG Storage Error:', e);
+    console.warn(`matchNG: Failed to parse storage key "${key}"`, e);
+    return null;
   }
 };
 
+const safeSet = (key: string, data: any) => {
+  if (!isBrowser) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`matchNG: Failed to set storage key "${key}"`, e);
+  }
+};
+
+let _isInternalUpdate = false;
+
+const notifyStorageChange = () => {
+  if (_isInternalUpdate || !isBrowser) return;
+  window.dispatchEvent(new Event('storage-sync'));
+};
+
 export const initializeStorage = () => {
-  if (_cache.isLoaded) return;
+  if (_cache.isLoaded || !isBrowser) return;
 
-  const rawUsers = localStorage.getItem(KEYS.USERS);
-  const rawJobs = localStorage.getItem(KEYS.JOBS);
-  const rawApps = localStorage.getItem(KEYS.APPLICATIONS);
-  const rawNotifs = localStorage.getItem(KEYS.NOTIFICATIONS);
-  const rawActive = localStorage.getItem(KEYS.ACTIVE_USER);
-  const rawQueue = localStorage.getItem(KEYS.QUEUE);
+  _cache.users = safeGet(KEYS.USERS) || [MOCK_SEEKER, MOCK_EMPLOYER];
+  _cache.jobs = safeGet(KEYS.JOBS) || [];
+  _cache.applications = safeGet(KEYS.APPLICATIONS) || [];
+  _cache.notifications = safeGet(KEYS.NOTIFICATIONS) || [];
+  _cache.activeUser = safeGet(KEYS.ACTIVE_USER) || null;
+  _cache.queue = safeGet(KEYS.QUEUE) || [];
 
-  _cache.users = rawUsers ? JSON.parse(rawUsers) : [MOCK_SEEKER, MOCK_EMPLOYER];
-  _cache.jobs = rawJobs ? JSON.parse(rawJobs) : [];
-  _cache.applications = rawApps ? JSON.parse(rawApps) : [];
-  _cache.notifications = rawNotifs ? JSON.parse(rawNotifs) : [];
-  _cache.activeUser = rawActive ? JSON.parse(rawActive) : null;
-  _cache.queue = rawQueue ? JSON.parse(rawQueue) : [];
-
-  if (!rawUsers) persist(KEYS.USERS, _cache.users);
+  if (!localStorage.getItem(KEYS.USERS)) safeSet(KEYS.USERS, _cache.users);
   
-  // If no jobs exist, populate with some mock data for development
-  if (!rawJobs || _cache.jobs.length === 0) {
+  if (_cache.jobs.length === 0) {
     _cache.jobs = generateMockJobs(10);
-    persist(KEYS.JOBS, _cache.jobs);
+    safeSet(KEYS.JOBS, _cache.jobs);
   }
 
   _cache.isLoaded = true;
@@ -95,8 +101,6 @@ export const getApplicationsBySeeker = (seekerId: string): JobApplication[] => {
 
 export const saveApplication = (app: JobApplication) => {
   _isInternalUpdate = true;
-  
-  // Idempotency: Avoid duplicates
   const exists = _cache.applications.find(a => a.jobId === app.jobId && a.seekerId === app.seekerId);
   if (exists && app.id !== exists.id) {
     _isInternalUpdate = false;
@@ -108,8 +112,6 @@ export const saveApplication = (app: JobApplication) => {
     _cache.applications[idx] = { ...app };
   } else {
     _cache.applications.push({ ...app });
-    
-    // Create notification for employer
     addNotification({
       userId: app.employerId,
       title: 'New Application',
@@ -119,7 +121,7 @@ export const saveApplication = (app: JobApplication) => {
     });
   }
 
-  persist(KEYS.APPLICATIONS, _cache.applications);
+  safeSet(KEYS.APPLICATIONS, _cache.applications);
   _isInternalUpdate = false;
   notifyStorageChange();
 };
@@ -138,7 +140,7 @@ export const addNotification = (notif: Omit<Notification, 'id' | 'timestamp' | '
     isRead: false
   };
   _cache.notifications.unshift(newNotif);
-  persist(KEYS.NOTIFICATIONS, _cache.notifications);
+  safeSet(KEYS.NOTIFICATIONS, _cache.notifications);
   notifyStorageChange();
 };
 
@@ -146,7 +148,7 @@ export const markNotifRead = (id: string) => {
   const notif = _cache.notifications.find(n => n.id === id);
   if (notif) {
     notif.isRead = true;
-    persist(KEYS.NOTIFICATIONS, _cache.notifications);
+    safeSet(KEYS.NOTIFICATIONS, _cache.notifications);
     notifyStorageChange();
   }
 };
@@ -165,8 +167,11 @@ export const saveUser = (user: UserProfile) => {
   const idx = _cache.users.findIndex(u => u.id === user.id);
   if (idx > -1) _cache.users[idx] = { ...user };
   else _cache.users.push({ ...user });
-  persist(KEYS.USERS, _cache.users);
-  if (_cache.activeUser?.id === user.id) persist(KEYS.ACTIVE_USER, user);
+  safeSet(KEYS.USERS, _cache.users);
+  if (_cache.activeUser?.id === user.id) {
+    _cache.activeUser = { ...user };
+    safeSet(KEYS.ACTIVE_USER, user);
+  }
   _isInternalUpdate = false;
   notifyStorageChange();
 };
@@ -176,7 +181,7 @@ export const saveJob = (job: Job) => {
   const idx = _cache.jobs.findIndex(j => j.id === job.id);
   if (idx > -1) _cache.jobs[idx] = { ...job };
   else _cache.jobs.push({ ...job });
-  persist(KEYS.JOBS, _cache.jobs);
+  safeSet(KEYS.JOBS, _cache.jobs);
   _isInternalUpdate = false;
   notifyStorageChange();
 };
@@ -184,32 +189,33 @@ export const saveJob = (job: Job) => {
 export const deleteJob = (jobId: string, employerId: string) => {
   _isInternalUpdate = true;
   _cache.jobs = _cache.jobs.filter(j => !(j.id === jobId && j.employerId === employerId));
-  persist(KEYS.JOBS, _cache.jobs);
+  safeSet(KEYS.JOBS, _cache.jobs);
   _isInternalUpdate = false;
   notifyStorageChange();
 };
 
 export const getActiveUser = (): UserProfile | null => {
-  const raw = localStorage.getItem(KEYS.ACTIVE_USER);
-  return raw ? JSON.parse(raw) : null;
+  if (!isBrowser) return null;
+  return safeGet(KEYS.ACTIVE_USER);
 };
 
 export const setActiveUser = (user: UserProfile | null) => {
   _cache.activeUser = user;
-  if (user) persist(KEYS.ACTIVE_USER, user);
-  else localStorage.removeItem(KEYS.ACTIVE_USER);
+  if (user) safeSet(KEYS.ACTIVE_USER, user);
+  else if (isBrowser) localStorage.removeItem(KEYS.ACTIVE_USER);
   notifyStorageChange();
 };
 
 export const addPendingAction = (action: Omit<PendingAction, 'id' | 'timestamp' | 'retryCount'>) => {
   const newAction: PendingAction = { ...action, id: `act-${Date.now()}`, timestamp: Date.now(), retryCount: 0 };
   _cache.queue.push(newAction);
-  persist(KEYS.QUEUE, _cache.queue);
+  safeSet(KEYS.QUEUE, _cache.queue);
   notifyStorageChange();
 };
 
 export const getPendingActions = () => _cache.queue;
 export const removePendingAction = (id: string) => {
   _cache.queue = _cache.queue.filter(a => a.id !== id);
-  persist(KEYS.QUEUE, _cache.queue);
+  safeSet(KEYS.QUEUE, _cache.queue);
+  notifyStorageChange();
 };
