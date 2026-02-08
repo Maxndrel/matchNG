@@ -77,12 +77,22 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     }
   }, []);
 
-  const refreshData = useCallback(() => {
+  // refreshData is updated to handle asynchronous storage calls correctly
+  const refreshData = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    setAllJobs(getJobsByEmployer(user.id));
-    setSeekers(getUsers().filter(u => u.role === UserRole.SEEKER));
-    setApplications(getApplicationsByEmployer(user.id));
-    setNotifications(getNotifications(user.id));
+    
+    // Concurrently fetching all required dashboard data
+    const [jobs, allUsers, apps, notes] = await Promise.all([
+      getJobsByEmployer(user.id),
+      getUsers(),
+      getApplicationsByEmployer(user.id),
+      getNotifications(user.id)
+    ]);
+
+    setAllJobs(jobs);
+    setSeekers(allUsers.filter(u => u.role === UserRole.SEEKER));
+    setApplications(apps);
+    setNotifications(notes);
   }, [user.id]);
 
   useEffect(() => {
@@ -101,13 +111,13 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
 
   const unreadCount = useMemo(() => notifications.filter(n => !n.isRead).length, [notifications]);
 
-  const handleStatusChange = (app: JobApplication, newStatus: ApplicationStatus) => {
-    saveApplication({ ...app, status: newStatus });
+  const handleStatusChange = async (app: JobApplication, newStatus: ApplicationStatus) => {
+    await saveApplication({ ...app, status: newStatus });
   };
 
-  const handleJobStatusChange = (jobId: string, newStatus: 'OPEN' | 'CLOSED' | 'DRAFT') => {
+  const handleJobStatusChange = async (jobId: string, newStatus: 'OPEN' | 'CLOSED' | 'DRAFT') => {
     const job = allJobs.find(j => j.id === jobId);
-    if (job) saveJob({ ...job, status: newStatus });
+    if (job) await saveJob({ ...job, status: newStatus });
   };
 
   const matchedCandidates = useMemo(() => {
@@ -143,7 +153,7 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
                </div>
                <div className="space-y-3">
                  {notifications.length === 0 ? <p className="text-center py-8 text-gray-400 font-medium">Clear as day.</p> : notifications.map(n => (
-                   <div key={n.id} onClick={() => { markNotifRead(n.id); if (n.linkToTab) setActiveTab(n.linkToTab as EmployerTabId); setShowNotifications(false); }} className={`p-4 rounded-2xl cursor-pointer border transition-all ${!n.isRead ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-transparent opacity-60'}`}>
+                   <div key={n.id} onClick={async () => { await markNotifRead(n.id); if (n.linkToTab) setActiveTab(n.linkToTab as EmployerTabId); setShowNotifications(false); }} className={`p-4 rounded-2xl cursor-pointer border transition-all ${!n.isRead ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-transparent opacity-60'}`}>
                       <p className="text-xs font-black text-gray-900">{n.title}</p>
                       <p className="text-[10px] text-gray-600 mt-1">{n.message}</p>
                    </div>

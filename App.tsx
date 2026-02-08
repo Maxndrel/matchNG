@@ -1,18 +1,19 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { UserProfile, UserRole } from './types';
-import Layout from './components/Layout';
-import Landing from './pages/Landing';
-import SeekerDashboard from './pages/seeker/SeekerDashboard';
-import EmployerDashboard from './pages/employer/EmployerDashboard';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AuthPage from './pages/auth/AuthPage';
-import About from './pages/info/About';
-import EmployersInfo from './pages/info/EmployersInfo';
-import Training from './pages/info/Training';
-import Contact from './pages/info/Contact';
-import { initializeStorage, getActiveUser, setActiveUser as setStorageActiveUser, saveUser } from './services/storage';
+import { UserProfile, UserRole } from './types.ts';
+import Layout from './components/Layout.tsx';
+import Landing from './pages/Landing.tsx';
+import SeekerDashboard from './pages/seeker/SeekerDashboard.tsx';
+import EmployerDashboard from './pages/employer/EmployerDashboard.tsx';
+import AdminDashboard from './pages/admin/AdminDashboard.tsx';
+import AuthPage from './pages/auth/AuthPage.tsx';
+import About from './pages/info/About.tsx';
+import EmployersInfo from './pages/info/EmployersInfo.tsx';
+import Training from './pages/info/Training.tsx';
+import Contact from './pages/info/Contact.tsx';
+import { initializeStorage, getActiveUser, setActiveUser as setStorageActiveUser, saveUser } from './services/storage.ts';
 
 type Page = 'LANDING' | 'DASHBOARD' | 'ADMIN' | 'LOGIN' | 'REGISTER' | 'ABOUT' | 'EMPLOYERS' | 'TRAINING' | 'CONTACT';
 
@@ -27,7 +28,6 @@ const App: React.FC = () => {
     
     const handleSync = () => {
       const session = getActiveUser();
-      // Only update if IDs differ to prevent infinite re-renders
       if (session?.id !== activeUser?.id) {
         setActiveUser(session);
       }
@@ -39,32 +39,36 @@ const App: React.FC = () => {
 
   // Root Initialization - Runs only once on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const init = async () => {
+      if (typeof window === 'undefined') return;
 
-    // 1. Setup local storage and initial data
-    initializeStorage();
-    
-    // 2. Hydrate session state
-    const session = getActiveUser();
-    if (session) {
-      setActiveUser(session);
-      // Auto-redirect to dashboard if user hits root pages with an active session
-      setCurrentPage(prev => (prev === 'LANDING' || prev === 'LOGIN' || prev === 'REGISTER') ? 'DASHBOARD' : prev);
-    }
-    
-    // 3. Mark app as ready for interactive rendering
-    setIsHydrated(true);
+      // 1. Setup local storage and initial data (Simulated DB connection)
+      await initializeStorage();
+      
+      // 2. Hydrate session state
+      const session = getActiveUser();
+      if (session) {
+        setActiveUser(session);
+        // Auto-redirect to dashboard if user hits root pages with an active session
+        setCurrentPage(prev => (prev === 'LANDING' || prev === 'LOGIN' || prev === 'REGISTER') ? 'DASHBOARD' : prev);
+      }
+      
+      // 3. Mark app as ready
+      setIsHydrated(true);
 
-    // Remove the static fallback loader from index.html if it exists
-    const loader = document.getElementById('loader');
-    if (loader) {
-      loader.style.opacity = '0';
-      setTimeout(() => loader.remove(), 300);
-    }
+      // Remove the static fallback loader from index.html
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 300);
+      }
+    };
+
+    init();
   }, []);
 
-  const handleAuthSuccess = (user: UserProfile) => {
-    saveUser(user);
+  const handleAuthSuccess = async (user: UserProfile) => {
+    await saveUser(user);
     setStorageActiveUser(user);
     setActiveUser(user);
     setCurrentPage('DASHBOARD');
@@ -76,12 +80,12 @@ const App: React.FC = () => {
     setCurrentPage('LANDING');
   };
 
-  const handleUpdateUser = useCallback((updated: UserProfile) => {
-    saveUser(updated);
+  const handleUpdateUser = useCallback(async (updated: UserProfile) => {
+    await saveUser(updated);
     setActiveUser(updated);
   }, []);
 
-  // Protected route logic - check session requirements after hydration
+  // Protected route logic
   useEffect(() => {
     if (!isHydrated) return;
     const isProtectedRoute = currentPage === 'DASHBOARD' || currentPage === 'ADMIN';
@@ -90,9 +94,8 @@ const App: React.FC = () => {
     }
   }, [currentPage, activeUser, isHydrated]);
 
-  // Don't render the main tree until client-side hydration is complete
   if (!isHydrated) {
-    return null; // The loader in index.html will handle this state
+    return null; 
   }
 
   const renderPage = () => {

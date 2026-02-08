@@ -1,11 +1,11 @@
 
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
-import { UserProfile, Job, MatchResult } from '../../types';
-import { getJobs, saveUser } from '../../services/storage';
-import { computeMatch } from '../../services/matchingEngine';
-import JobCard from '../../components/JobCard';
-import { INDUSTRIES, NIGERIA_STATES } from '../../constants';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { UserProfile, Job, MatchResult } from '../../types.ts';
+import { getJobs, saveUser } from '../../services/storage.ts';
+import { computeMatch } from '../../services/matchingEngine.ts';
+import JobCard from '../../components/JobCard.tsx';
+import { INDUSTRIES, NIGERIA_STATES } from '../../constants.ts';
+import { Search, SlidersHorizontal, X, Loader2 } from 'lucide-react';
 
 interface MatchesProps {
   user: UserProfile;
@@ -15,7 +15,7 @@ const JOBS_PER_PAGE = 10;
 
 const Matches: React.FC<MatchesProps> = ({ user }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [isComputing, setIsComputing] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(JOBS_PER_PAGE);
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -27,26 +27,29 @@ const Matches: React.FC<MatchesProps> = ({ user }) => {
   const [minScore, setMinScore] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
 
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    const data = await getJobs();
+    setJobs(data);
+    setIsLoading(false);
+  }, []);
+
   useEffect(() => {
-    const loadData = () => {
-      setJobs(getJobs());
-      setIsComputing(false);
-    };
     loadData();
     window.addEventListener('storage-sync', loadData);
     return () => window.removeEventListener('storage-sync', loadData);
-  }, []);
+  }, [loadData]);
 
-  const handleApply = (jobId: string) => {
+  const handleApply = async (jobId: string) => {
     if (user.appliedJobIds.includes(jobId)) return;
     const updatedUser = {
       ...user,
       appliedJobIds: [...user.appliedJobIds, jobId]
     };
-    saveUser(updatedUser);
+    await saveUser(updatedUser);
   };
 
-  const handleSave = (jobId: string) => {
+  const handleSave = async (jobId: string) => {
     const isSaved = user.savedJobIds.includes(jobId);
     const updatedUser = {
       ...user,
@@ -54,7 +57,7 @@ const Matches: React.FC<MatchesProps> = ({ user }) => {
         ? user.savedJobIds.filter(id => id !== jobId) 
         : [...user.savedJobIds, jobId]
     };
-    saveUser(updatedUser);
+    await saveUser(updatedUser);
   };
 
   const filteredMatches = useMemo(() => {
@@ -92,8 +95,6 @@ const Matches: React.FC<MatchesProps> = ({ user }) => {
     return () => observer.disconnect();
   }, [handleObserver]);
 
-  if (isComputing) return <div className="py-20 text-center font-bold">Initializing matching pool...</div>;
-
   return (
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -103,7 +104,6 @@ const Matches: React.FC<MatchesProps> = ({ user }) => {
         </div>
       </header>
 
-      {/* Main Prominent Search Bar */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-grow group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
@@ -136,7 +136,6 @@ const Matches: React.FC<MatchesProps> = ({ user }) => {
         </button>
       </div>
 
-      {/* Advanced Filters Section */}
       {showFilters && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-8 bg-white border border-gray-100 rounded-[2rem] shadow-sm animate-in slide-in-from-top-4 duration-300">
           <div className="space-y-2">
@@ -180,7 +179,12 @@ const Matches: React.FC<MatchesProps> = ({ user }) => {
         </div>
       )}
 
-      {filteredMatches.length === 0 ? (
+      {isLoading ? (
+        <div className="py-32 flex flex-col items-center justify-center space-y-4">
+          <Loader2 className="w-10 h-10 animate-spin text-emerald-600" />
+          <p className="text-xs font-black text-gray-400 uppercase tracking-widest animate-pulse">Querying Matching Engine...</p>
+        </div>
+      ) : filteredMatches.length === 0 ? (
         <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
           <Search className="w-12 h-12 text-gray-100 mx-auto mb-4" />
           <h3 className="text-xl font-black text-gray-900">No matches found</h3>
