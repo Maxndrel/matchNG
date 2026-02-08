@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -21,7 +22,7 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('LANDING');
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Synchronize internal state with storage service notifications
+  // Sync state with storage changes
   useEffect(() => {
     const handleSync = () => {
       const session = getActiveUser();
@@ -36,13 +37,13 @@ const App: React.FC = () => {
     }
   }, [activeUser]);
 
-  // Root Client-Only Hydration Hook
+  // Client-side initialization
   useEffect(() => {
     initializeStorage();
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      // Auto-redirect to dashboard if session exists, but only after mount
+      // Logic for persistent sessions
       if (currentPage === 'LANDING' || currentPage === 'LOGIN') {
         setCurrentPage('DASHBOARD');
       }
@@ -68,23 +69,22 @@ const App: React.FC = () => {
     setActiveUser(updated);
   }, []);
 
-  // Guard navigation logic: wait for hydration
+  // Protected route logic
   useEffect(() => {
     if (!isHydrated) return;
-
     const isDashboardRoute = currentPage === 'DASHBOARD';
     const isAdminRoute = currentPage === 'ADMIN';
-
     if ((isDashboardRoute || isAdminRoute) && !activeUser) {
       setCurrentPage('LOGIN');
     }
   }, [currentPage, activeUser, isHydrated]);
 
+  // Prevent hydration mismatch: render nothing or a loader until client mount
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
         <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">matchNG Engine Booting...</p>
+        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">Initializing matchNG...</p>
       </div>
     );
   }
@@ -92,7 +92,7 @@ const App: React.FC = () => {
   const renderPage = () => {
     switch (currentPage) {
       case 'LANDING':
-        return <Landing onStart={(role) => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
+        return <Landing onStart={() => setCurrentPage('REGISTER')} onNavigate={setCurrentPage} />;
       case 'ABOUT':
         return <About />;
       case 'EMPLOYERS':
