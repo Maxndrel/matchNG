@@ -1,6 +1,4 @@
 
-"use client";
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole } from './types';
 import Layout from './components/Layout';
@@ -25,31 +23,24 @@ const App: React.FC = () => {
   // Synchronize internal state with storage service notifications
   useEffect(() => {
     const handleSync = () => {
-      if (typeof window === 'undefined') return;
       const session = getActiveUser();
-      if (JSON.stringify(session) !== JSON.stringify(activeUser)) {
+      if (session?.id !== activeUser?.id) {
         setActiveUser(session);
       }
     };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage-sync', handleSync);
-      return () => window.removeEventListener('storage-sync', handleSync);
-    }
-  }, [activeUser]);
+    window.addEventListener('storage-sync', handleSync);
+    return () => window.removeEventListener('storage-sync', handleSync);
+  }, [activeUser?.id]);
 
-  // Root Client-Only Hydration Hook
+  // Root Initialization
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
     initializeStorage();
     const session = getActiveUser();
     if (session) {
       setActiveUser(session);
-      // Auto-redirect to dashboard if session exists
-      if (currentPage === 'LANDING' || currentPage === 'LOGIN' || currentPage === 'REGISTER') {
-        setCurrentPage('DASHBOARD');
-      }
+      // Auto-redirect if session is active
+      setCurrentPage(prev => (prev === 'LANDING' || prev === 'LOGIN' || prev === 'REGISTER') ? 'DASHBOARD' : prev);
     }
     setIsHydrated(true);
   }, []);
@@ -75,11 +66,8 @@ const App: React.FC = () => {
   // Protected route logic
   useEffect(() => {
     if (!isHydrated) return;
-
-    const isDashboardRoute = currentPage === 'DASHBOARD';
-    const isAdminRoute = currentPage === 'ADMIN';
-
-    if ((isDashboardRoute || isAdminRoute) && !activeUser) {
+    const isProtected = currentPage === 'DASHBOARD' || currentPage === 'ADMIN';
+    if (isProtected && !activeUser) {
       setCurrentPage('LOGIN');
     }
   }, [currentPage, activeUser, isHydrated]);
@@ -87,8 +75,8 @@ const App: React.FC = () => {
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">matchNG Engine Booting...</p>
+        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-400 font-bold text-[10px] uppercase tracking-[0.2em] animate-pulse">Initializing Engine...</p>
       </div>
     );
   }
