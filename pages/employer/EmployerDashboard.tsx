@@ -12,7 +12,8 @@ import {
   markNotifRead,
   saveJob,
   getJobs,
-  addPendingAction
+  addPendingAction,
+  getStorageUsage
 } from '../../services/storage.ts';
 import { useClientLocalStore } from '../../hooks/useClientLocalStore.ts';
 import { computeCandidateMatch } from '../../services/matchingEngine.ts';
@@ -47,7 +48,10 @@ import {
   Loader2,
   Database,
   Search,
-  Target
+  Target,
+  Briefcase,
+  Star,
+  ExternalLink
 } from 'lucide-react';
 
 interface EmployerDashboardProps {
@@ -65,6 +69,7 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
   const [seekers, setSeekers] = useState<UserProfile[]>([]);
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [storageUse, setStorageUse] = useState(0);
   
   // UI State
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -112,12 +117,13 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     setSeekers(allUsers.filter(u => u.role === UserRole.SEEKER));
     setApplications(apps);
     setNotifications(notes);
+    setStorageUse(getStorageUsage());
     setIsSyncing(false);
   }, [user.id]);
 
   useEffect(() => {
     refreshData();
-    const interval = setInterval(refreshData, 10000); // Poll for real-time applications
+    const interval = setInterval(refreshData, 10000); 
     window.addEventListener('storage-sync', refreshData);
     return () => {
       clearInterval(interval);
@@ -149,18 +155,13 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
       createdAt: new Date().toISOString()
     } as Job;
 
-    if (!navigator.onLine) {
-      await addPendingAction({ type: 'UPDATE_PROFILE', payload: jobToPublish }); // Reusing generic profile update for jobs
-      alert("Offline: Job queued for publication.");
-    } else {
-      await saveJob(jobToPublish);
-      alert("Success: Job is now live on the matching engine!");
-    }
-
+    await saveJob(jobToPublish);
+    
     // Reset draft
     setDraftJob({ title: '', industry: INDUSTRIES[0], description: '', requiredSkills: [], location: draftJob.location, isRemote: false, status: 'DRAFT' });
     setPostStep(1);
     setActiveTab('LISTINGS');
+    refreshData();
   };
 
   const handleStatusChange = async (app: JobApplication, newStatus: ApplicationStatus) => {
@@ -168,14 +169,23 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     refreshData();
   };
 
+  const handleUpdateJobStatus = async (job: Job, newStatus: 'OPEN' | 'CLOSED') => {
+    await saveJob({ ...job, status: newStatus });
+    refreshData();
+  };
+
   const matchedCandidates = useMemo(() => {
     if (!selectedJobId) return [];
     const job = allJobs.find(j => j.id === selectedJobId);
     if (!job) return [];
-    return seekers.map(s => computeCandidateMatch(job, s)).sort((a, b) => b.scoreFinal - a.scoreFinal);
+    return seekers
+      .map(s => computeCandidateMatch(job, s))
+      .sort((a, b) => b.scoreFinal - a.scoreFinal);
   }, [selectedJobId, allJobs, seekers]);
 
   if (!isMounted) return null;
+
+  // --- RENDERING MODULES ---
 
   const renderOverview = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-24">
@@ -249,6 +259,264 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     </div>
   );
 
+  const renderListings = () => (
+    <div className="space-y-8 animate-in fade-in pb-32">
+      <header className="flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900">Job Listings</h2>
+          <p className="text-gray-500 font-medium">Manage your active and archived roles.</p>
+        </div>
+        <div className="flex bg-gray-100 p-1 rounded-xl">
+          {(['OPEN', 'CLOSED'] as const).map(f => (
+            <button 
+              key={f}
+              onClick={() => setJobListingFilter(f)}
+              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${jobListingFilter === f ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <div className="grid gap-4">
+        {allJobs.filter(j => j.status === jobListingFilter).length === 0 ? (
+          <div className="py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100">
+            <Briefcase className="w-12 h-12 text-gray-100 mx-auto mb-4" />
+            <p className="text-gray-400 font-bold">No {jobListingFilter.toLowerCase()} jobs found.</p>
+          </div>
+        ) : (
+          allJobs.filter(j => j.status === jobListingFilter).map(job => (
+            <div key={job.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 group hover:border-emerald-200 transition-all">
+              <div className="flex-grow">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full">{job.industry}</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-gray-50 text-gray-400 rounded-full">{job.isRemote ? 'Remote' : 'On-Site'}</span>
+                </div>
+                <h4 className="text-xl font-black text-gray-900">{job.title}</h4>
+                <p className="text-xs text-gray-400 font-medium">{job.location.city}, {job.location.state} • Posted {new Date(job.createdAt).toLocaleDateString()}</p>
+              </div>
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <button 
+                  onClick={() => setSelectedJobId(job.id)}
+                  className="flex-1 md:flex-none px-6 py-3 bg-gray-50 text-gray-700 rounded-xl font-bold text-xs hover:bg-emerald-50 hover:text-emerald-700 transition-all"
+                >
+                  View Matches
+                </button>
+                <button 
+                  onClick={() => handleUpdateJobStatus(job, job.status === 'OPEN' ? 'CLOSED' : 'OPEN')}
+                  className={`flex-1 md:flex-none px-6 py-3 rounded-xl font-bold text-xs transition-all ${job.status === 'OPEN' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                >
+                  {job.status === 'OPEN' ? 'Archive' : 'Restore'}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const renderCandidates = () => (
+    <div className="space-y-8 animate-in fade-in pb-32">
+      <header className="space-y-2">
+        <h2 className="text-3xl font-black text-gray-900">Candidate Match Discovery</h2>
+        <p className="text-gray-500 font-medium">Identify top talent via the 3-factor matching algorithm.</p>
+      </header>
+
+      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Filter by Job Posting</label>
+        <select 
+          value={selectedJobId || ''}
+          onChange={e => setSelectedJobId(e.target.value)}
+          className="w-full p-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-emerald-500 transition outline-none font-bold text-gray-900"
+        >
+          <option value="">Select a job to run analysis...</option>
+          {allJobs.filter(j => j.status === 'OPEN').map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+        </select>
+      </div>
+
+      {!selectedJobId ? (
+        <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
+           <Target className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+           <p className="text-gray-400 font-bold">Select an open role to find compatible seekers.</p>
+        </div>
+      ) : matchedCandidates.length === 0 ? (
+        <div className="py-20 text-center">
+           <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mx-auto mb-4" />
+           <p className="text-gray-400 font-black uppercase tracking-widest">Running Match Engine...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {matchedCandidates.map(result => (
+            <div key={result.seeker.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm group hover:border-emerald-200 hover:shadow-xl transition-all relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-[4rem] flex flex-col items-center justify-center border-l border-b border-emerald-100">
+                  <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Match</span>
+                  <span className="text-2xl font-black text-emerald-700">{(result.scoreFinal * 100).toFixed(0)}%</span>
+               </div>
+               
+               <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center border border-gray-200">
+                      <UserIcon className="w-7 h-7 text-gray-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-black text-gray-900">{result.seeker.fullName}</h4>
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{result.seeker.location.city}, {result.seeker.location.state}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {result.seeker.skills.slice(0, 3).map(s => (
+                      <span key={s} className="px-3 py-1 bg-gray-50 text-gray-500 rounded-lg text-[10px] font-bold uppercase">{s}</span>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                    Primary Industry: <span className="text-gray-900 font-bold">{result.seeker.primaryIndustry || 'N/A'}</span><br/>
+                    Primary Skill: <span className="text-gray-900 font-bold">{result.seeker.primarySkill || 'N/A'}</span>
+                  </p>
+                  
+                  <div className="pt-4 flex gap-2">
+                    <button className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all">View Full CV</button>
+                    <button className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all">
+                      <Star className="w-5 h-5" />
+                    </button>
+                  </div>
+               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderApplications = () => (
+    <div className="space-y-8 animate-in fade-in pb-32">
+       <header>
+          <h2 className="text-3xl font-black text-gray-900">Incoming Applications</h2>
+          <p className="text-gray-500 font-medium">Manage intent from {applications.length} job seekers.</p>
+       </header>
+
+       <div className="grid gap-4">
+         {applications.length === 0 ? (
+           <div className="py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100">
+             <Inbox className="w-12 h-12 text-gray-100 mx-auto mb-4" />
+             <p className="text-gray-400 font-bold">No applications received yet.</p>
+           </div>
+         ) : (
+           applications.map(app => (
+             <div key={app.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 group hover:border-emerald-100 transition-all">
+                <div className="flex-grow w-full md:w-auto">
+                   <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                        app.status === ApplicationStatus.SHORTLISTED ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                        app.status === ApplicationStatus.REJECTED ? 'bg-red-50 text-red-700 border-red-100' :
+                        'bg-blue-50 text-blue-700 border-blue-100'
+                      }`}>
+                        {app.status}
+                      </span>
+                      <span className="text-[9px] text-gray-300 font-bold">{new Date(app.timestamp).toLocaleDateString()}</span>
+                   </div>
+                   <h4 className="text-2xl font-black text-gray-900">{app.seekerName}</h4>
+                   <p className="text-sm font-bold text-gray-500 uppercase tracking-tight">Applying for: <span className="text-emerald-600">{app.jobTitle}</span></p>
+                </div>
+
+                <div className="flex gap-2 w-full md:w-auto">
+                   <button 
+                    onClick={() => handleStatusChange(app, ApplicationStatus.SHORTLISTED)}
+                    className="flex-1 md:flex-none p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-100 transition-all"
+                   >
+                     <CheckCircle className="w-6 h-6" />
+                   </button>
+                   <button 
+                    onClick={() => handleStatusChange(app, ApplicationStatus.REJECTED)}
+                    className="flex-1 md:flex-none p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all"
+                   >
+                     <X className="w-6 h-6" />
+                   </button>
+                   <button className="flex-1 md:flex-none px-6 py-4 bg-gray-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">
+                     Details
+                   </button>
+                </div>
+             </div>
+           ))
+         )}
+       </div>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in pb-32">
+       <header className="space-y-2">
+         <h2 className="text-4xl font-black text-gray-900 tracking-tight">Employer Hub</h2>
+         <p className="text-gray-500 font-medium">Configuration for {user.fullName}.</p>
+       </header>
+
+       <div className="space-y-6">
+          <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
+                <Building className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Organization Profile</h3>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Your public entity data</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Entity Name</label>
+                <input 
+                  type="text" 
+                  value={user.fullName}
+                  readOnly
+                  className="w-full p-4 bg-gray-50 border-transparent rounded-2xl font-bold text-gray-900 cursor-not-allowed opacity-60"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+                <Database className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Data & Infrastructure</h3>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Local storage synchronization</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between text-xs font-black uppercase tracking-widest text-gray-400 mb-1">
+                <span>Local Cache Integrity</span>
+                <span>{storageUse.toFixed(2)}% Used</span>
+              </div>
+              <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden">
+                <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${storageUse}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <LogOut className="w-6 h-6" />
+              <h3 className="text-xl font-black uppercase tracking-tight">Security</h3>
+            </div>
+            <button 
+              onClick={onLogout}
+              className="w-full flex items-center justify-between p-6 rounded-2xl border border-red-100 bg-red-50/30 text-red-600 hover:bg-red-50 transition-all group"
+            >
+              <span className="font-black text-sm uppercase tracking-widest">Terminate Active Session</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+       </div>
+    </div>
+  );
+
   const renderPostJob = () => (
     <div className="max-w-3xl mx-auto space-y-12 animate-in fade-in pb-32">
       <header className="flex justify-between items-center">
@@ -258,7 +526,6 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
             <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${draftMeta.isDirty ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
               {draftMeta.isDirty ? 'Saving Draft...' : 'Draft Saved'}
             </span>
-            {draftMeta.lastSavedAt && <span className="text-[10px] text-gray-400 font-medium italic">Last saved {new Date(draftMeta.lastSavedAt).toLocaleTimeString()}</span>}
           </div>
         </div>
         <div className="flex gap-1">
@@ -386,27 +653,20 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     </div>
   );
 
-  // Added renderContent to handle tab switching
   const renderContent = () => {
     switch (activeTab) {
-      case 'OVERVIEW':
-        return renderOverview();
-      case 'POST_JOB':
-        return renderPostJob();
-      default:
-        return (
-          <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
-            <Search className="w-12 h-12 text-gray-100 mx-auto mb-4" />
-            <h3 className="text-xl font-black text-gray-900">Module under construction</h3>
-            <p className="text-gray-400 text-sm font-medium">We are currently fine-tuning this specialized tool.</p>
-          </div>
-        );
+      case 'OVERVIEW': return renderOverview();
+      case 'POST_JOB': return renderPostJob();
+      case 'LISTINGS': return renderListings();
+      case 'CANDIDATES': return renderCandidates();
+      case 'APPLICATIONS': return renderApplications();
+      case 'SETTINGS': return renderSettings();
+      default: return renderOverview();
     }
   };
 
-  // Added main return statement
   return (
-    <div className="relative pt-8 lg:pt-12 pb-32 min-h-screen">
+    <div className="relative pt-8 lg:pt-12 pb-32 min-h-screen bg-gray-50">
       <main className="min-w-0 max-w-5xl mx-auto px-4">
         {renderContent()}
       </main>
@@ -415,5 +675,4 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
   );
 };
 
-// Added missing default export
 export default EmployerDashboard;
