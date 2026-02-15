@@ -7,7 +7,8 @@ import Matches from './Matches.tsx';
 import Profile from './Profile.tsx';
 import { getJobs, saveUser, getActiveUser, getStorageUsage } from '../../services/storage.ts';
 import { getRecommendations } from '../../services/matchingEngine.ts';
-import { SKILL_INDEX } from '../../constants.ts';
+import { getMarketInsights, getSkillGapAnalysis } from '../../services/analyticsEngine.ts';
+import { SKILL_INDEX, INDUSTRIES } from '../../constants.ts';
 import JobCard from '../../components/JobCard.tsx';
 import BottomNav, { NavTabId } from '../../components/BottomNav.tsx';
 import { useConnectivity } from '../../hooks/useConnectivity.ts';
@@ -34,7 +35,14 @@ import {
   ChevronRight,
   Database,
   CloudOff,
-  ShieldAlert
+  ShieldAlert,
+  BarChart3,
+  Wallet,
+  Activity,
+  Flame,
+  ChevronDown,
+  BookOpen,
+  ArrowUpRight
 } from 'lucide-react';
 
 interface SeekerDashboardProps {
@@ -73,9 +81,7 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('matchNG_last_tab');
-      if (saved) {
-        setActiveTab(saved as NavTabId);
-      }
+      if (saved) setActiveTab(saved as NavTabId);
       setIsMounted(true);
     }
   }, []);
@@ -91,6 +97,15 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
     return getRecommendations(user, jobs);
   }, [user, jobs]);
 
+  const marketInsights = useMemo(() => getMarketInsights(jobs), [jobs]);
+  const skillGaps = useMemo(() => getSkillGapAnalysis(user, jobs), [user, jobs]);
+
+  const readinessScore = useMemo(() => {
+    if (skillGaps.length === 0) return 100;
+    const avgMissingDemand = skillGaps.reduce((acc, s) => acc + s.demandRate, 0) / skillGaps.length;
+    return Math.max(0, 100 - Math.floor(avgMissingDemand * 0.5));
+  }, [skillGaps]);
+
   const savedJobs = useMemo(() => {
     return allMatches.filter(m => user.savedJobIds.includes(m.job.id));
   }, [allMatches, user.savedJobIds]);
@@ -99,37 +114,8 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
     return allMatches.filter(m => user.appliedJobIds.includes(m.job.id));
   }, [allMatches, user.appliedJobIds]);
 
-  const skillGaps = useMemo(() => {
-    const topSkillsInMatches = new Set<string>();
-    const count = Math.min(10, allMatches.length);
-    for (let i = 0; i < count; i++) {
-      const match = allMatches[i];
-      for (const s of match.job.requiredSkills) {
-        topSkillsInMatches.add(s);
-      }
-    }
-    const missing = Array.from(topSkillsInMatches).filter(s => !user.skills.includes(s));
-    return missing.map(sid => SKILL_INDEX.get(sid)).filter(Boolean);
-  }, [allMatches, user.skills]);
-
-  const handleApply = async (jobId: string) => {
-    if (user.appliedJobIds.includes(jobId)) return;
-    const updatedUser = {
-      ...user,
-      appliedJobIds: [...user.appliedJobIds, jobId]
-    };
-    await onUpdateUser(updatedUser);
-  };
-
-  const handleSave = async (jobId: string) => {
-    const isSaved = user.savedJobIds.includes(jobId);
-    const updatedUser = {
-      ...user,
-      savedJobIds: isSaved 
-        ? user.savedJobIds.filter(id => id !== jobId) 
-        : [...user.savedJobIds, jobId]
-    };
-    await onUpdateUser(updatedUser);
+  const handleUpdateUserInternal = async (updated: UserProfile) => {
+    await onUpdateUser(updated);
   };
 
   if (!isMounted || isLoading) {
@@ -141,325 +127,334 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
     );
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'OVERVIEW':
-        return (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-              <div>
-                <h2 className="text-4xl font-black text-gray-900 leading-tight tracking-tight">Moni, {user.fullName.split(' ')[0]}!</h2>
-                <p className="text-gray-500 font-medium">Your career algorithm has matched {allMatches.length} opportunities today.</p>
-              </div>
-              
-              {/* DISCRETE OFFLINE STATUS BADGE */}
-              {!isOnline && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-2xl border border-amber-100 animate-in zoom-in-95">
-                  <CloudOff className="w-4 h-4" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Offline Access Only</span>
-                </div>
-              )}
-            </header>
-
-            {/* PLATFORM SCOPE NOTICE */}
-            <div className="p-5 bg-white rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
-               <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                  <ShieldAlert className="w-5 h-5 text-emerald-600" />
-               </div>
-               <p className="text-[11px] font-bold text-gray-500">
-                  <span className="text-emerald-700 font-black">Platform Scope:</span> This platform connects users to on-site and location-based jobs. Remote work opportunities are not supported.
-               </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Match Confidence</p>
-                <h3 className="text-5xl font-black text-emerald-600">{(allMatches[0]?.scoreFinal * 100 || 0).toFixed(0)}%</h3>
-                <div className="w-full bg-gray-50 h-2 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${(allMatches[0]?.scoreFinal * 100 || 0)}%` }}></div>
-                </div>
-              </div>
-              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Active Pipeline</p>
-                <h3 className="text-5xl font-black text-gray-900">{jobs.length.toLocaleString()}</h3>
-                <button onClick={() => setActiveTab('MATCHES')} className="flex items-center gap-1 text-xs font-black uppercase tracking-widest text-emerald-600 hover:underline text-left">
-                  Browse Engine <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-blue-200 transition-all">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Interests</p>
-                <h3 className="text-5xl font-black text-blue-600">{user.appliedJobIds.length}</h3>
-                <button onClick={() => setActiveTab('APPLICATIONS')} className="flex items-center gap-1 text-xs font-black uppercase tracking-widest text-blue-600 hover:underline text-left">
-                  Track Status <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-
-            <section className="bg-gray-900 rounded-[2.5rem] p-10 text-white overflow-hidden relative group">
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
-                <div className="flex-grow space-y-4">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30">
-                    <Zap className="w-3 h-3" /> Hottest Match This Hour
-                  </div>
-                  <h3 className="text-3xl font-black leading-tight">Recommended for your skills in {user.location.city || 'Nigeria'}</h3>
-                  {allMatches[0] && (
-                    <div className="p-6 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-md">
-                      <h4 className="font-bold text-xl">{allMatches[0].job.title}</h4>
-                      <p className="text-gray-400 mb-4">{allMatches[0].job.employerName} • {allMatches[0].job.industry}</p>
-                      <div className="flex gap-2">
-                         <span className="flex items-center gap-1 bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                           <Target className="w-3 h-3" /> {(allMatches[0].scoreFinal * 100).toFixed(0)}% Match
-                         </span>
-                         <span className="flex items-center gap-1 bg-white/10 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                           <MapPin className="w-3 h-3" /> Near You
-                         </span>
-                      </div>
-                    </div>
-                  )}
-                  <button onClick={() => setActiveTab('MATCHES')} className="bg-emerald-600 text-white px-10 py-4 rounded-xl font-black hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-900">Explore Matching Pool</button>
-                </div>
-              </div>
-            </section>
+  const renderOverview = () => (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h2 className="text-4xl font-black text-gray-900 leading-tight tracking-tight">Moni, {user.fullName.split(' ')[0]}!</h2>
+          <p className="text-gray-500 font-medium">Your career algorithm has matched {allMatches.length} opportunities today.</p>
+        </div>
+        {!isOnline && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-2xl border border-amber-100">
+            <CloudOff className="w-4 h-4" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Offline Mode</span>
           </div>
-        );
+        )}
+      </header>
 
-      case 'PROFILE':
-        return <Profile user={user} onUpdate={onUpdateUser} />;
-
-      case 'MATCHES':
-        return <Matches user={user} />;
-
-      case 'TRAINING':
-        return (
-          <div className="space-y-12 animate-in fade-in">
-            <header className="max-w-2xl space-y-2">
-              <h2 className="text-4xl font-black text-gray-900 tracking-tight">Skill Gap Accelerator</h2>
-              <p className="text-gray-500 font-medium">We analyzed your top matches. Acquiring these skills could increase your match rate by up to 40%.</p>
-            </header>
-
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-8">
-                <div className="flex items-center gap-3">
-                  <Cpu className="w-6 h-6 text-emerald-600" />
-                  <h3 className="text-xl font-black uppercase tracking-tight">Missing High-Value Skills</h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {skillGaps.length === 0 ? (
-                    <p className="text-sm font-bold text-emerald-600 bg-emerald-50 p-4 rounded-2xl w-full border border-emerald-100">
-                      Perfect! You possess all the primary skills requested in your top 10 matches.
-                    </p>
-                  ) : (
-                    skillGaps.map(skill => (
-                      <span key={skill?.id} className="px-5 py-3 bg-red-50 text-red-700 rounded-2xl text-xs font-black uppercase tracking-widest border border-red-100 flex items-center gap-2">
-                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                         {skill?.name}
-                      </span>
-                    ))
-                  )}
-                </div>
-                <div className="pt-4 border-t border-gray-50">
-                   <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Recommended Training Partners</h4>
-                   <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:border-emerald-200 cursor-pointer transition-all">
-                        <p className="text-xs font-black">Utiva Tech</p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Digital Skills</p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:border-emerald-200 cursor-pointer transition-all">
-                        <p className="text-xs font-black">FarmCrowdy Edu</p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Agri-Business</p>
-                      </div>
-                   </div>
-                </div>
-              </div>
-
-              <div className="bg-emerald-600 p-8 rounded-[2.5rem] text-white space-y-8 shadow-2xl shadow-emerald-100">
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="w-6 h-6" />
-                  <h3 className="text-xl font-black uppercase tracking-tight">Growth Multiplier</h3>
-                </div>
-                <p className="text-emerald-100 text-sm leading-relaxed">
-                  Our algorithm tracks "Trend Multipliers" (20% weight). Currently, **Logistics** and **Solar Maintenance** skills are receiving a 1.5x boost in score calculations.
-                </p>
-                <div className="grid grid-cols-1 gap-4">
-                  {[
-                    { label: 'Logistics Optimization', icon: Sprout },
-                    { label: 'Solar Photovoltaics', icon: Sun }
-                  ].map((it, i) => (
-                    <div key={i} className="bg-white/10 p-4 rounded-2xl border border-white/10 flex items-center justify-between group cursor-pointer hover:bg-white/20 transition-all">
-                      <div className="flex items-center gap-3">
-                        <it.icon className="w-4 h-4 text-emerald-400" />
-                        <span className="font-bold text-sm">{it.label}</span>
-                      </div>
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Match confidence</p>
+          <h3 className="text-5xl font-black text-emerald-600">{(allMatches[0]?.scoreFinal * 100 || 0).toFixed(0)}%</h3>
+          <div className="w-full bg-gray-50 h-2 rounded-full overflow-hidden">
+            <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${(allMatches[0]?.scoreFinal * 100 || 0)}%` }}></div>
           </div>
-        );
+        </div>
+        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-emerald-200 transition-all">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Active Pipeline</p>
+          <h3 className="text-5xl font-black text-gray-900">{jobs.length.toLocaleString()}</h3>
+          <button onClick={() => setActiveTab('MATCHES')} className="flex items-center gap-1 text-xs font-black uppercase tracking-widest text-emerald-600 hover:underline">
+            Browse Engine <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between h-44 group hover:border-blue-200 transition-all">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Applied</p>
+          <h3 className="text-5xl font-black text-blue-600">{user.appliedJobIds.length}</h3>
+          <button onClick={() => setActiveTab('APPLICATIONS')} className="flex items-center gap-1 text-xs font-black uppercase tracking-widest text-blue-600 hover:underline">
+            Track Status <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
 
-      case 'SETTINGS':
-        return (
-          <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in pb-20">
-             <header className="space-y-2">
-               <h2 className="text-4xl font-black text-gray-900 tracking-tight">Settings</h2>
-               <p className="text-gray-500 font-medium">Manage your notifications and account preferences.</p>
-             </header>
+      <section className="bg-gray-900 rounded-[2.5rem] p-10 text-white overflow-hidden relative">
+        <div className="relative z-10 space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30">
+            <Zap className="w-3 h-3" /> Hottest Match
+          </div>
+          <h3 className="text-3xl font-black leading-tight">Recommended for {user.location.city || 'you'}</h3>
+          {allMatches[0] && (
+            <div className="p-6 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-md">
+              <h4 className="font-bold text-xl">{allMatches[0].job.title}</h4>
+              <p className="text-gray-400 mb-4">{allMatches[0].job.employerName}</p>
+              <button onClick={() => setActiveTab('MATCHES')} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black hover:bg-emerald-500 transition-all">Apply Instantly</button>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+
+  const renderTraining = () => (
+    <div className="space-y-10 animate-in fade-in pb-32">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tight leading-none">Career Growth Hub</h2>
+          <p className="text-gray-500 font-medium mt-3">Data-driven insights to maximize your professional value.</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+           <Activity className="w-4 h-4 animate-pulse" />
+           <span className="text-[10px] font-black uppercase tracking-widest">Real-time Analysis</span>
+        </div>
+      </header>
+
+      {/* Snapshot Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+           <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 flex-shrink-0">
+              <Flame className="w-6 h-6" />
+           </div>
+           <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Market Heat</p>
+              <h4 className="text-xl font-black text-gray-900">{marketInsights.topIndustries[0].growth} Growth</h4>
+           </div>
+        </div>
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+           <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 flex-shrink-0">
+              <Wallet className="w-6 h-6" />
+           </div>
+           <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Salary Benchmark</p>
+              <h4 className="text-xl font-black text-gray-900">₦{marketInsights.salaryBenchmarks[user.primaryIndustry || 'Technology'].mid.toLocaleString()}</h4>
+           </div>
+        </div>
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+           <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 flex-shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+           </div>
+           <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Readiness Score</p>
+              <h4 className="text-xl font-black text-gray-900">{readinessScore}% Ready</h4>
+           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Skill Gap & Roadmaps */}
+        <div className="lg:col-span-2 space-y-8">
+          <section className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-8">
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                   <Target className="w-6 h-6 text-emerald-600" />
+                   <h3 className="text-2xl font-black text-gray-900 tracking-tight">Skill Gap Analysis</h3>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Target: {user.primaryIndustry}</span>
+             </div>
 
              <div className="space-y-6">
-                <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
-                  <div className="flex items-center gap-3">
-                    <Database className="w-6 h-6 text-gray-900" />
-                    <h3 className="text-xl font-black uppercase tracking-tight">Data Footprint</h3>
+                {skillGaps.length === 0 ? (
+                  <div className="p-8 bg-emerald-50 rounded-3xl border border-emerald-100 text-center space-y-3">
+                    <CheckCircle className="w-12 h-12 text-emerald-600 mx-auto" />
+                    <h4 className="text-xl font-black text-emerald-900">Perfect Alignment!</h4>
+                    <p className="text-emerald-700 font-medium">Your current skills match 100% of the top requirements in your sector.</p>
                   </div>
-                  <div className="space-y-4">
-                    <div className="flex justify-between text-xs font-black uppercase tracking-widest text-gray-400 mb-1">
-                      <span>LocalStorage Usage</span>
-                      <span>{storageUse.toFixed(2)}%</span>
+                ) : (
+                  skillGaps.slice(0, 3).map((skill, idx) => (
+                    <div key={idx} className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-emerald-100 transition-all space-y-4">
+                       <div className="flex justify-between items-start">
+                          <div>
+                             <h4 className="text-lg font-black text-gray-900">{skill.name}</h4>
+                             <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-1">High Demand: {skill.demandRate}% of jobs</p>
+                          </div>
+                          <div className="px-3 py-1 bg-white rounded-full text-[10px] font-black uppercase tracking-widest border border-gray-100">Step {idx + 1}</div>
+                       </div>
+                       
+                       <div className="space-y-2">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Recommended Roadmap</p>
+                          <div className="flex flex-wrap gap-2">
+                             {skill.resources.map((res, i) => (
+                               <div key={i} className="flex-1 min-w-[140px] p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between group cursor-pointer hover:border-emerald-500 transition-all">
+                                  <BookOpen className="w-4 h-4 text-gray-400 mb-2 group-hover:text-emerald-500" />
+                                  <p className="text-xs font-bold text-gray-900 leading-tight">{res.title}</p>
+                                  <div className="mt-3 flex items-center justify-between">
+                                     <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">{res.provider}</span>
+                                     <ArrowUpRight className="w-3 h-3 text-emerald-600" />
+                                  </div>
+                               </div>
+                             ))}
+                          </div>
+                       </div>
                     </div>
-                    <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden border border-gray-100">
-                      <div 
-                        className="bg-emerald-500 h-full transition-all duration-500" 
-                        style={{ width: `${storageUse}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-[10px] text-gray-400 font-medium italic">Persistent storage ensures your drafts and matches are available even offline.</p>
-                  </div>
+                  ))
+                )}
+             </div>
+          </section>
+        </div>
+
+        {/* Right Column: Market Stats */}
+        <div className="space-y-8">
+          <section className="bg-gray-900 p-8 rounded-[2.5rem] text-white space-y-8 overflow-hidden relative">
+             <div className="relative z-10 space-y-6">
+                <div className="flex items-center gap-3">
+                   <BarChart3 className="w-6 h-6 text-emerald-400" />
+                   <h3 className="text-xl font-black uppercase tracking-tight">Market Snapshot</h3>
+                </div>
+                
+                <div className="space-y-5">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">High-Demand Industries</p>
+                   <div className="space-y-3">
+                      {marketInsights.topIndustries.slice(0, 4).map((ind, i) => (
+                        <div key={i} className="flex items-center justify-between group cursor-pointer">
+                           <div className="flex items-center gap-3">
+                              <span className="w-5 h-5 flex items-center justify-center text-[10px] font-black border border-white/20 rounded-md">{i + 1}</span>
+                              <span className="text-sm font-bold group-hover:text-emerald-400 transition-colors">{ind.name}</span>
+                           </div>
+                           <span className="text-[10px] font-black text-emerald-400">{ind.growth}</span>
+                        </div>
+                      ))}
+                   </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
-                  <div className="flex items-center gap-3">
-                    <Smartphone className="w-6 h-6 text-gray-900" />
-                    <h3 className="text-xl font-black uppercase tracking-tight">Low-Bandwidth Modes</h3>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                      <div>
-                        <p className="font-bold text-gray-900">SMS Matching Alerts</p>
-                        <p className="text-xs text-gray-400 font-medium italic">Receive top 3 matches via SMS when offline.</p>
-                      </div>
-                      <button className="w-12 h-6 bg-emerald-500 rounded-full p-1 flex items-center shadow-inner text-white">
-                        <div className="w-4 h-4 bg-white rounded-full translate-x-6" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="w-6 h-6 text-emerald-600" />
-                    <h3 className="text-xl font-black uppercase tracking-tight">Algorithm Privacy</h3>
-                  </div>
-                  <p className="text-gray-500 text-sm italic">You are currently sharing your **Location** and **Skill Set** with our matching engine. This is required for high-accuracy placement.</p>
-                  <div className="flex items-center gap-2 p-4 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100 font-black text-xs uppercase tracking-widest">
-                    <CheckCircle className="w-4 h-4" /> GDPR / NDPR Compliant
-                  </div>
-                </div>
-
-                <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
-                  <div className="flex items-center gap-3 text-red-600">
-                    <User className="w-6 h-6" />
-                    <h3 className="text-xl font-black uppercase tracking-tight">Account Management</h3>
-                  </div>
-                  <div className="pt-2">
-                    <button 
-                      onClick={onLogout}
-                      className="w-full flex items-center justify-between p-5 rounded-2xl border border-red-100 bg-red-50/30 text-red-600 hover:bg-red-50 transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <LogOut className="w-5 h-5" />
-                        <span className="font-black text-sm uppercase tracking-widest">Sign Out of matchNG</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                    <button 
-                      onClick={() => {
-                        if (confirm("This will delete all locally saved data and drafts. Continue?")) {
-                          localStorage.clear();
-                          window.location.reload();
-                        }
-                      }}
-                      className="w-full mt-4 text-[10px] font-black text-gray-300 uppercase tracking-widest hover:text-red-400 transition-colors"
-                    >
-                      Purge Local Data Cache
-                    </button>
-                  </div>
+                <div className="pt-6 border-t border-white/10 space-y-4">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Salary Growth Curve ({user.primaryIndustry})</p>
+                   <div className="space-y-4">
+                      {[
+                        { label: 'Entry', val: marketInsights.salaryBenchmarks[user.primaryIndustry || 'Technology'].entry },
+                        { label: 'Mid', val: marketInsights.salaryBenchmarks[user.primaryIndustry || 'Technology'].mid },
+                        { label: 'Senior', val: marketInsights.salaryBenchmarks[user.primaryIndustry || 'Technology'].senior }
+                      ].map((sal, i) => (
+                        <div key={i} className="flex justify-between items-end">
+                           <span className="text-xs font-medium opacity-60">{sal.label}</span>
+                           <div className="flex flex-col items-end">
+                              <span className="text-xs font-black">₦{sal.val.toLocaleString()}</span>
+                              <div className="w-24 h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                                 <div className="bg-emerald-500 h-full" style={{ width: `${(i+1)*33}%` }} />
+                              </div>
+                           </div>
+                        </div>
+                      ))}
+                   </div>
                 </div>
              </div>
              
-             <button className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-black transition shadow-xl">Save All Preferences</button>
-          </div>
-        );
+             {/* Decorative Background Element */}
+             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl"></div>
+          </section>
 
+          <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+             <div className="flex items-center gap-3">
+                <MapPin className="w-5 h-5 text-gray-400" />
+                <h3 className="text-sm font-black uppercase tracking-tight">Geographic Heat</h3>
+             </div>
+             <div className="space-y-4">
+                {marketInsights.regionalDemand.slice(0, 3).map((reg, i) => (
+                  <div key={i} className="space-y-2">
+                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                        <span>{reg.state}</span>
+                        <span>{reg.demandScore}% Demand</span>
+                     </div>
+                     <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${reg.demandScore}%` }} />
+                     </div>
+                  </div>
+                ))}
+             </div>
+             <button className="w-full py-4 border-2 border-gray-50 text-gray-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-emerald-200 hover:text-emerald-600 transition-all">
+                Expand Full Map
+             </button>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'OVERVIEW': return renderOverview();
+      case 'PROFILE': return <Profile user={user} onUpdate={handleUpdateUserInternal} />;
+      case 'MATCHES': return <Matches user={user} />;
+      case 'TRAINING': return renderTraining();
       case 'APPLICATIONS':
         return (
-          <div className="space-y-8">
+          <div className="space-y-8 pb-32">
             <header>
-              <h2 className="text-3xl font-black text-gray-900">Application Tracker</h2>
-              <p className="text-gray-500 font-medium">Monitoring your progress with {user.appliedJobIds.length} employers.</p>
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight leading-none">Application Tracker</h2>
+              <p className="text-gray-500 font-medium mt-3">Monitoring progress with {user.appliedJobIds.length} employers.</p>
             </header>
             {appliedJobs.length === 0 ? (
               <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 flex flex-col items-center">
-                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-6">
-                  <FileText className="w-8 h-8 text-gray-300" />
-                </div>
+                <FileText className="w-16 h-16 text-gray-100 mb-6" />
                 <h3 className="text-2xl font-black text-gray-900">No active applications</h3>
-                <p className="text-gray-500 mb-8 max-w-sm">One-tap apply to start tracking your career progress.</p>
-                <button onClick={() => setActiveTab('MATCHES')} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold">Start Matching</button>
+                <button onClick={() => setActiveTab('MATCHES')} className="mt-6 bg-emerald-600 text-white px-10 py-4 rounded-xl font-black">Find Your First Match</button>
               </div>
             ) : (
-              <div className="grid gap-6">
+              <div className="grid gap-4">
                 {appliedJobs.map(match => (
-                  <div key={match.job.id} className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 group hover:border-emerald-200 transition-colors">
-                    <div className="flex-grow space-y-2 text-left w-full">
+                  <div key={match.job.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 group hover:border-emerald-200 transition-all">
+                    <div className="flex-grow text-left w-full">
                       <h4 className="text-2xl font-black text-gray-900">{match.job.title}</h4>
                       <p className="text-gray-500 font-bold">{match.job.employerName} • {match.job.location.city}</p>
-                      <div className="flex gap-4 pt-4">
-                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest">Stage: Shortlisted</span>
-                        <span className="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-[10px] font-black uppercase tracking-widest">Sent recently</span>
-                      </div>
                     </div>
-                    <button className="w-full md:w-auto px-6 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm">View Status</button>
+                    <div className="flex gap-4">
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">Reviewing</span>
+                        <button className="px-6 py-3 bg-gray-900 text-white rounded-xl font-black text-xs uppercase tracking-widest">Details</button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
         );
-      
       case 'SAVED':
         return (
-          <div className="space-y-8">
+          <div className="space-y-8 pb-32">
             <header>
-              <h2 className="text-3xl font-black text-gray-900">Saved Opportunities</h2>
-              <p className="text-gray-500 font-medium">Roles you bookmarked for later consideration.</p>
+              <h2 className="text-3xl font-black text-gray-900 tracking-tight leading-none">Saved Opportunities</h2>
+              <p className="text-gray-500 font-medium mt-3">Roles you've bookmarked for later consideration.</p>
             </header>
             {savedJobs.length === 0 ? (
-              <div className="text-center py-32 bg-white rounded-[3rem] border-gray-100 flex flex-col items-center">
-                <Star className="w-12 h-12 text-gray-100 mb-4" />
-                <p className="text-gray-400 font-black uppercase tracking-widest">No saved jobs yet</p>
+              <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 flex flex-col items-center">
+                <Star className="w-16 h-16 text-gray-100 mb-6" />
+                <p className="text-gray-400 font-black uppercase tracking-widest">Your save list is empty</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {savedJobs.map(match => (
                   <JobCard 
                     key={match.job.id} 
                     match={match} 
-                    onApply={handleApply} 
-                    onSave={handleSave}
+                    onApply={(id) => {}} 
+                    onSave={(id) => {}} 
                     isApplied={user.appliedJobIds.includes(match.job.id)} 
-                    isSaved={user.savedJobIds.includes(match.job.id)}
+                    isSaved={true} 
                   />
                 ))}
               </div>
             )}
           </div>
         );
-
-      default:
-        return <div className="py-20 text-center text-gray-400 font-black uppercase tracking-widest">Module under construction</div>;
+      case 'SETTINGS':
+        return (
+          <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in pb-32">
+            <header>
+              <h2 className="text-4xl font-black text-gray-900 tracking-tight leading-none">Account Hub</h2>
+              <p className="text-gray-500 font-medium mt-3">Security and platform configuration.</p>
+            </header>
+            <div className="space-y-6">
+               <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
+                  <div className="flex items-center gap-4">
+                     <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center">
+                        <Database className="w-6 h-6" />
+                     </div>
+                     <div>
+                        <h3 className="text-xl font-black">Data Cache</h3>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Using {storageUse.toFixed(1)}% of allocated space</p>
+                     </div>
+                  </div>
+                  <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden">
+                     <div className="bg-emerald-500 h-full" style={{ width: `${storageUse}%` }} />
+                  </div>
+               </div>
+               <button 
+                  onClick={onLogout}
+                  className="w-full flex items-center justify-between p-8 rounded-[2rem] border border-red-100 bg-red-50/20 text-red-600 group"
+                >
+                  <span className="font-black text-lg uppercase tracking-widest">Terminate Session</span>
+                  <LogOut className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+               </button>
+            </div>
+          </div>
+        );
+      default: return null;
     }
   };
 
