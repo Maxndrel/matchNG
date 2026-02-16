@@ -64,37 +64,34 @@ const EMPLOYERS = [
   "BUA Group", "MainOne", "GIG Logistics", "Kobo360", "Interswitch"
 ];
 
-const JOB_TEMPLATES: Record<string, string[]> = {
-  'Technology': ["Software Engineer", "Systems Analyst", "Technical Support", "UI/UX Designer"],
-  'Construction': ["Civil Engineer", "Masonry Specialist", "Site Supervisor", "Electrical Lead"],
-  'Agriculture': ["Farm Manager", "Irrigation Specialist", "Crop Scientist", "Mechanized Operator"],
-  'Healthcare': ["Community Health Worker", "Medical Lab Tech", "Pharmacy Assistant", "Nurse Aide"],
-  'Transportation': ["Logistics Coordinator", "Heavy Duty Driver", "Fleet Supervisor", "Dispatch Rider"]
-};
+const ROLE_PREFIXES = ["Senior", "Lead", "Junior", "Specialist", "Officer", "Supervisor"];
 
 /**
  * Generates a robust set of jobs for MVP seeding.
- * Capped at 800 to fit within LocalStorage limits (approx 5MB total app footprint).
+ * Strictly uses the provided Industry/Skill hierarchy.
  */
 export function generateSeedJobs(): Job[] {
   const jobs: Job[] = [];
-  const TOTAL_COUNT = 800; // Scaled for LocalStorage safety while maintaining diversity
+  const TOTAL_COUNT = 800; 
   
   for (let i = 0; i < TOTAL_COUNT; i++) {
     const zoneData = GEO_REGISTRY[i % GEO_REGISTRY.length];
     const stateData = zoneData.states[i % zoneData.states.length];
     const city = stateData.cities[i % stateData.cities.length];
     
-    let industry = INDUSTRIES[i % INDUSTRIES.length];
-    if (stateData.hub.includes('Agri') && i % 2 === 0) industry = 'Agriculture';
-    if (stateData.hub.includes('Tech') && i % 3 === 0) industry = 'Technology';
+    // Cycle through industries
+    const industry = INDUSTRIES[i % INDUSTRIES.length];
     
-    const roles = JOB_TEMPLATES[industry] || ["General Specialist"];
-    const title = roles[i % roles.length];
-    const skill = ONBOARDING_MAP[industry].skills[i % ONBOARDING_MAP[industry].skills.length];
+    // Cycle through skills for that specific industry
+    const skillsList = ONBOARDING_MAP[industry].skills;
+    const skill = skillsList[i % skillsList.length];
+
+    // Generate a title based on the skill
+    const prefix = ROLE_PREFIXES[i % ROLE_PREFIXES.length];
+    const title = `${prefix} ${skill}`;
 
     const costOfLivingMultiplier = (stateData.name === 'Lagos' || stateData.name === 'Abuja (FCT)') ? 1.5 : 1.0;
-    const baseSalary = industry === 'Technology' ? 200000 : 85000;
+    const baseSalary = industry === 'Technology' ? 220000 : 95000;
     const expMultiplier = (i % 3 === 0) ? 2.5 : (i % 3 === 1) ? 1.5 : 1.0;
     const lowRange = Math.floor(baseSalary * expMultiplier * costOfLivingMultiplier);
     const highRange = Math.floor(lowRange * 1.4);
@@ -103,9 +100,9 @@ export function generateSeedJobs(): Job[] {
       id: `job-${i.toString().padStart(5, '0')}`,
       employerId: `emp-${i % EMPLOYERS.length}`,
       employerName: EMPLOYERS[i % EMPLOYERS.length],
-      title: `${title} (${skill})`,
+      title: title,
       industry: industry,
-      description: `Join the ${industry} division in ${stateData.name}. We are looking for a dedicated ${title} to manage projects in the ${city} area. Required expertise in ${skill}.`,
+      description: `We are looking for a qualified ${title} to join our team in ${stateData.name}. As a ${skill} professional, you will be responsible for operational excellence in the ${city} district. Deep expertise in ${skill} is mandatory for this role.`,
       requiredSkills: [skill],
       location: {
         state: stateData.name,

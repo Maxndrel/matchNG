@@ -51,40 +51,47 @@ export const TREND_DATA: IndustryTrend[] = [
 export const TREND_INDEX = new Map(TREND_DATA.map(t => [t.industry, t.trendScore]));
 
 export const SKILL_TAXONOMY: Skill[] = [
-  { id: '1', name: 'Frontend Development', category: 'Tech' },
-  { id: '2', name: 'Backend Development', category: 'Tech' },
-  { id: '3', name: 'Mobile App Development', category: 'Tech' },
-  { id: '4', name: 'UI/UX Design', category: 'Tech' },
-  { id: '5', name: 'IT Support', category: 'Tech' },
-  { id: '6', name: 'Masonry', category: 'Construction' },
-  { id: '7', name: 'Plumbing', category: 'Construction' },
-  { id: '8', name: 'Electrical Installation', category: 'Construction' },
-  { id: '9', name: 'Carpentry', category: 'Construction' },
-  { id: '10', name: 'Welding', category: 'Construction' },
-  { id: '11', name: 'Crop Farming', category: 'Agri' },
-  { id: '12', name: 'Poultry Farming', category: 'Agri' },
-  { id: '13', name: 'Fish Farming', category: 'Agri' },
-  { id: '14', name: 'Farm Equipment Operation', category: 'Agri' },
-  { id: '15', name: 'Produce Processing', category: 'Agri' },
-  { id: '16', name: 'Community Health Assistance', category: 'Health' },
-  { id: '17', name: 'Medical Records', category: 'Health' },
-  { id: '18', name: 'Pharmacy Assistance', category: 'Health' },
-  { id: '19', name: 'Laboratory Support', category: 'Health' },
-  { id: '20', name: 'Home Care Support', category: 'Health' },
-  { id: '21', name: 'Truck Driving', category: 'Logistics' },
-  { id: '22', name: 'Motorcycle Dispatch', category: 'Logistics' },
-  { id: '23', name: 'Vehicle Maintenance', category: 'Logistics' },
-  { id: '24', name: 'Logistics Assistance', category: 'Logistics' },
-  { id: '25', name: 'Fleet Operations', category: 'Logistics' }
+  // Tech
+  { id: 't1', name: 'Frontend Development', category: 'Technology' },
+  { id: 't2', name: 'Backend Development', category: 'Technology' },
+  { id: 't3', name: 'Mobile App Development', category: 'Technology' },
+  { id: 't4', name: 'UI/UX Design', category: 'Technology' },
+  { id: 't5', name: 'IT Support', category: 'Technology' },
+  // Construction
+  { id: 'c1', name: 'Masonry', category: 'Construction' },
+  { id: 'c2', name: 'Plumbing', category: 'Construction' },
+  { id: 'c3', name: 'Electrical Installation', category: 'Construction' },
+  { id: 'c4', name: 'Carpentry', category: 'Construction' },
+  { id: 'c5', name: 'Welding', category: 'Construction' },
+  // Agri
+  { id: 'a1', name: 'Crop Farming', category: 'Agriculture' },
+  { id: 'a2', name: 'Poultry Farming', category: 'Agriculture' },
+  { id: 'a3', name: 'Fish Farming', category: 'Agriculture' },
+  { id: 'a4', name: 'Farm Equipment Operation', category: 'Agriculture' },
+  { id: 'a5', name: 'Produce Processing', category: 'Agriculture' },
+  // Health
+  { id: 'h1', name: 'Community Health Assistance', category: 'Healthcare' },
+  { id: 'h2', name: 'Medical Records', category: 'Healthcare' },
+  { id: 'h3', name: 'Pharmacy Assistance', category: 'Healthcare' },
+  { id: 'h4', name: 'Laboratory Support', category: 'Healthcare' },
+  { id: 'h5', name: 'Home Care Support', category: 'Healthcare' },
+  // Transport
+  { id: 'tr1', name: 'Truck Driving', category: 'Transportation' },
+  { id: 'tr2', name: 'Motorcycle Dispatch', category: 'Transportation' },
+  { id: 'tr3', name: 'Vehicle Maintenance', category: 'Transportation' },
+  { id: 'tr4', name: 'Logistics Assistance', category: 'Transportation' },
+  { id: 'tr5', name: 'Fleet Operations', category: 'Transportation' }
 ];
 
-// O(1) Lookup Index for Skills - KEYED BY NAME for app-wide consistency
 export const SKILL_INDEX = new Map(SKILL_TAXONOMY.map(s => [s.name, s]));
 
 export const SKILL_ALIASES: Record<string, string> = {
   'JS': 'Frontend Development',
   'Javascript': 'Frontend Development',
   'React': 'Frontend Development',
+  'Coding': 'Backend Development',
   'MS Word': 'IT Support',
-  'Repairman': 'Vehicle Maintenance'
+  'Repairman': 'Vehicle Maintenance',
+  'Mason': 'Masonry',
+  'Doctor Assistant': 'Community Health Assistance'
 };
