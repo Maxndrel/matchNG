@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, memo, useCallback } from 'react';
 import { MatchResult, ApplicationStatus } from '../types';
-import { MapPin, Globe, Star, CheckCircle2, Loader2, Cloud, Zap, Wallet, Award } from 'lucide-react';
+import { MapPin, Globe, Star, CheckCircle2, Loader2, Cloud, Zap, Wallet, Award, Clock, XCircle } from 'lucide-react';
 import { addPendingAction, saveApplication, getActiveUser } from '../services/storage';
 
 interface JobCardProps {
@@ -12,9 +12,10 @@ interface JobCardProps {
   onSave: (jobId: string) => void;
   isApplied?: boolean;
   isSaved?: boolean;
+  applicationStatus?: ApplicationStatus;
 }
 
-const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplied, isSaved }) => {
+const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplied, isSaved, applicationStatus }) => {
   const { job, scoreFinal, scoreSkill } = match;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -96,6 +97,41 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
 
   const isPrimarySkillMatch = user?.primarySkill && job.requiredSkills.includes(user.primarySkill);
 
+  const renderStatusBadge = () => {
+    if (!applicationStatus) return null;
+
+    switch (applicationStatus) {
+      case ApplicationStatus.SHORTLISTED:
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-full animate-pulse shadow-lg shadow-emerald-200">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Shortlisted</span>
+          </div>
+        );
+      case ApplicationStatus.REJECTED:
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-red-100 text-red-600 rounded-full border border-red-200">
+            <XCircle className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Rejected</span>
+          </div>
+        );
+      case ApplicationStatus.HIRED:
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-200">
+            <Award className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Hired!</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Pending Review</span>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className={`bg-white rounded-[2.5rem] border ${isPrimarySkillMatch ? 'border-emerald-200 ring-4 ring-emerald-500/5' : 'border-gray-100'} shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden flex flex-col group h-full relative`}>
       {feedback && (
@@ -110,9 +146,10 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
       <div className="p-6 md:p-8 flex-grow space-y-5">
         <div className="flex justify-between items-start gap-4">
           <div className="space-y-1 overflow-hidden">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="inline-block text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{job.industry}</span>
-              {isPrimarySkillMatch && (
+              {renderStatusBadge()}
+              {isPrimarySkillMatch && !applicationStatus && (
                 <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-white bg-emerald-600 px-2.5 py-1 rounded-full shadow-sm">
                   <Award className="w-3 h-3" /> Expertise Match
                 </span>

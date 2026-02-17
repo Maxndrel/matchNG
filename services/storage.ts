@@ -3,7 +3,7 @@ import { UserProfile, Job, UserRole, PendingAction, JobApplication, Notification
 import { generateSeedJobs } from './jobSeeder.ts';
 
 /**
- * PRODUCTION STORAGE ENGINE v1.2.2
+ * PRODUCTION STORAGE ENGINE v1.2.3
  * Features: Encryption, Versioning, Scaled Dataset Seeding.
  */
 
@@ -120,6 +120,11 @@ export const getJobsByEmployer = async (employerId: string): Promise<Job[]> => {
 export const getApplicationsByEmployer = async (employerId: string): Promise<JobApplication[]> => {
   const apps = await getItem<JobApplication[]>('applications') || [];
   return apps.filter(a => a.employerId === employerId);
+};
+
+export const getApplicationsBySeeker = async (seekerId: string): Promise<JobApplication[]> => {
+  const apps = await getItem<JobApplication[]>('applications') || [];
+  return apps.filter(a => a.seekerId === seekerId);
 };
 
 export const saveApplication = async (app: JobApplication): Promise<void> => {

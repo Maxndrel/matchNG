@@ -2,10 +2,10 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { UserProfile, Job, MatchResult } from '../../types.ts';
+import { UserProfile, Job, MatchResult, JobApplication } from '../../types.ts';
 import Matches from './Matches.tsx';
 import Profile from './Profile.tsx';
-import { getJobs, saveUser, getActiveUser, getStorageUsage } from '../../services/storage.ts';
+import { getJobs, saveUser, getActiveUser, getStorageUsage, getApplicationsBySeeker } from '../../services/storage.ts';
 import { getRecommendations, computeMatch } from '../../services/matchingEngine.ts';
 import { getMarketInsights, getSkillGapAnalysis } from '../../services/analyticsEngine.ts';
 import { SKILL_INDEX, INDUSTRIES } from '../../constants.ts';
@@ -55,6 +55,7 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
   const [activeTab, setActiveTab] = useState<NavTabId>('OVERVIEW');
   const [isMounted, setIsMounted] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [userApplications, setUserApplications] = useState<JobApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [storageUse, setStorageUse] = useState(0);
   const { isOnline } = useConnectivity();
@@ -62,15 +63,19 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getJobs();
-      setJobs(data);
+      const [allJobs, allApps] = await Promise.all([
+        getJobs(),
+        getApplicationsBySeeker(user.id)
+      ]);
+      setJobs(allJobs);
+      setUserApplications(allApps);
       setStorageUse(getStorageUsage());
     } catch (e) {
-      console.error("Failed to fetch jobs", e);
+      console.error("Failed to fetch dashboard data", e);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user.id]);
 
   useEffect(() => {
     fetchData();
@@ -106,18 +111,23 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
     return Math.max(0, 100 - Math.floor(avgMissingDemand * 0.5));
   }, [skillGaps]);
 
-  // Ensure saved/applied jobs show up even if their match score falls below recommendation threshold
+  // pairing jobs with their specific application records
+  const appliedJobsWithStatus = useMemo(() => {
+    return userApplications.map(app => {
+      const job = jobs.find(j => j.id === app.jobId);
+      if (!job) return null;
+      return {
+        match: computeMatch(user, job),
+        status: app.status
+      };
+    }).filter(Boolean);
+  }, [userApplications, jobs, user]);
+
   const savedJobs = useMemo(() => {
     return jobs
       .filter(j => user.savedJobIds.includes(j.id))
       .map(j => computeMatch(user, j));
   }, [jobs, user.savedJobIds, user]);
-
-  const appliedJobs = useMemo(() => {
-    return jobs
-      .filter(j => user.appliedJobIds.includes(j.id))
-      .map(j => computeMatch(user, j));
-  }, [jobs, user.appliedJobIds, user]);
 
   const handleUpdateUserInternal = async (updated: UserProfile) => {
     await onUpdateUser(updated);
@@ -393,9 +403,9 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
           <div className="space-y-8 pb-32">
             <header>
               <h2 className="text-3xl font-black text-gray-900 tracking-tight leading-none">Application Tracker</h2>
-              <p className="text-gray-500 font-medium mt-3">Monitoring progress with {user.appliedJobIds.length} employers.</p>
+              <p className="text-gray-500 font-medium mt-3">Monitoring progress with {userApplications.length} employers.</p>
             </header>
-            {appliedJobs.length === 0 ? (
+            {appliedJobsWithStatus.length === 0 ? (
               <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 flex flex-col items-center">
                 <FileText className="w-16 h-16 text-gray-100 mb-6" />
                 <h3 className="text-2xl font-black text-gray-900">No active applications</h3>
@@ -403,14 +413,15 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {appliedJobs.map(match => (
+                {appliedJobsWithStatus.map(data => (
                   <JobCard 
-                    key={match.job.id} 
-                    match={match} 
+                    key={data.match.job.id} 
+                    match={data.match} 
                     onApply={handleApply} 
                     onSave={handleSave} 
                     isApplied={true} 
-                    isSaved={user.savedJobIds.includes(match.job.id)} 
+                    isSaved={user.savedJobIds.includes(data.match.job.id)}
+                    applicationStatus={data.status}
                   />
                 ))}
               </div>
