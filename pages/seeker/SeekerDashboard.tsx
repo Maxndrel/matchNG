@@ -6,7 +6,7 @@ import { UserProfile, Job, MatchResult } from '../../types.ts';
 import Matches from './Matches.tsx';
 import Profile from './Profile.tsx';
 import { getJobs, saveUser, getActiveUser, getStorageUsage } from '../../services/storage.ts';
-import { getRecommendations } from '../../services/matchingEngine.ts';
+import { getRecommendations, computeMatch } from '../../services/matchingEngine.ts';
 import { getMarketInsights, getSkillGapAnalysis } from '../../services/analyticsEngine.ts';
 import { SKILL_INDEX, INDUSTRIES } from '../../constants.ts';
 import JobCard from '../../components/JobCard.tsx';
@@ -106,16 +106,41 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
     return Math.max(0, 100 - Math.floor(avgMissingDemand * 0.5));
   }, [skillGaps]);
 
+  // Ensure saved/applied jobs show up even if their match score falls below recommendation threshold
   const savedJobs = useMemo(() => {
-    return allMatches.filter(m => user.savedJobIds.includes(m.job.id));
-  }, [allMatches, user.savedJobIds]);
+    return jobs
+      .filter(j => user.savedJobIds.includes(j.id))
+      .map(j => computeMatch(user, j));
+  }, [jobs, user.savedJobIds, user]);
 
   const appliedJobs = useMemo(() => {
-    return allMatches.filter(m => user.appliedJobIds.includes(m.job.id));
-  }, [allMatches, user.appliedJobIds]);
+    return jobs
+      .filter(j => user.appliedJobIds.includes(j.id))
+      .map(j => computeMatch(user, j));
+  }, [jobs, user.appliedJobIds, user]);
 
   const handleUpdateUserInternal = async (updated: UserProfile) => {
     await onUpdateUser(updated);
+  };
+
+  const handleApply = async (jobId: string) => {
+    if (user.appliedJobIds.includes(jobId)) return;
+    const updatedUser = {
+      ...user,
+      appliedJobIds: [...user.appliedJobIds, jobId]
+    };
+    await onUpdateUser(updatedUser);
+  };
+
+  const handleSave = async (jobId: string) => {
+    const isSaved = user.savedJobIds.includes(jobId);
+    const updatedUser = {
+      ...user,
+      savedJobIds: isSaved 
+        ? user.savedJobIds.filter(id => id !== jobId) 
+        : [...user.savedJobIds, jobId]
+    };
+    await onUpdateUser(updatedUser);
   };
 
   if (!isMounted || isLoading) {
@@ -377,18 +402,16 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
                 <button onClick={() => setActiveTab('MATCHES')} className="mt-6 bg-emerald-600 text-white px-10 py-4 rounded-xl font-black">Find Your First Match</button>
               </div>
             ) : (
-              <div className="grid gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {appliedJobs.map(match => (
-                  <div key={match.job.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 group hover:border-emerald-200 transition-all">
-                    <div className="flex-grow text-left w-full">
-                      <h4 className="text-2xl font-black text-gray-900">{match.job.title}</h4>
-                      <p className="text-gray-500 font-bold">{match.job.employerName} • {match.job.location.city}</p>
-                    </div>
-                    <div className="flex gap-4">
-                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">Reviewing</span>
-                        <button className="px-6 py-3 bg-gray-900 text-white rounded-xl font-black text-xs uppercase tracking-widest">Details</button>
-                    </div>
-                  </div>
+                  <JobCard 
+                    key={match.job.id} 
+                    match={match} 
+                    onApply={handleApply} 
+                    onSave={handleSave} 
+                    isApplied={true} 
+                    isSaved={user.savedJobIds.includes(match.job.id)} 
+                  />
                 ))}
               </div>
             )}
@@ -405,6 +428,7 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
               <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 flex flex-col items-center">
                 <Star className="w-16 h-16 text-gray-100 mb-6" />
                 <p className="text-gray-400 font-black uppercase tracking-widest">Your save list is empty</p>
+                <button onClick={() => setActiveTab('MATCHES')} className="mt-6 bg-emerald-600 text-white px-10 py-4 rounded-xl font-black">Browse Jobs</button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -412,8 +436,8 @@ const SeekerDashboard: React.FC<SeekerDashboardProps> = ({ user, onUpdateUser, o
                   <JobCard 
                     key={match.job.id} 
                     match={match} 
-                    onApply={(id) => {}} 
-                    onSave={(id) => {}} 
+                    onApply={handleApply} 
+                    onSave={handleSave} 
                     isApplied={user.appliedJobIds.includes(match.job.id)} 
                     isSaved={true} 
                   />

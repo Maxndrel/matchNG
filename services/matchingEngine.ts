@@ -76,8 +76,8 @@ export const getRecommendations = (seeker: UserProfile, allJobs: Job[]): MatchRe
     
     // High-level industry filter
     if (job.industry !== seeker.primaryIndustry) {
-      // 10% chance to show out-of-industry jobs if match is extremely high otherwise
-      if (Math.random() > 0.1) continue; 
+      // 5% chance to show out-of-industry jobs if match is extremely high otherwise
+      if (Math.random() > 0.05) continue; 
     }
 
     const isRemote = job.isRemote;
@@ -106,7 +106,18 @@ export const getRecommendations = (seeker: UserProfile, allJobs: Job[]): MatchRe
     });
   }
 
-  return results.sort((a, b) => b.scoreFinal - a.scoreFinal);
+  // ENHANCED SORTING: 
+  // 1. Primary Skill Matches ALWAYS first.
+  // 2. Then by final score descending.
+  return results.sort((a, b) => {
+    const aIsPrimary = seeker.primarySkill && a.job.requiredSkills.includes(seeker.primarySkill);
+    const bIsPrimary = seeker.primarySkill && b.job.requiredSkills.includes(seeker.primarySkill);
+    
+    if (aIsPrimary && !bIsPrimary) return -1;
+    if (!aIsPrimary && bIsPrimary) return 1;
+    
+    return b.scoreFinal - a.scoreFinal;
+  });
 };
 
 export const computeMatch = (seeker: UserProfile, job: Job): MatchResult => {

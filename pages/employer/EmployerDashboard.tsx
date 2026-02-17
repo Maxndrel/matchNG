@@ -87,7 +87,8 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
       requiredSkills: [],
       location: { state: 'Lagos', lga: '', city: '', lat: 6.5, lon: 3.3 },
       isRemote: false,
-      status: 'DRAFT'
+      status: 'DRAFT',
+      salaryRange: ''
     }
   );
 
@@ -158,7 +159,7 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
     await saveJob(jobToPublish);
     
     // Reset draft
-    setDraftJob({ title: '', industry: INDUSTRIES[0], description: '', requiredSkills: [], location: draftJob.location, isRemote: false, status: 'DRAFT' });
+    setDraftJob({ title: '', industry: INDUSTRIES[0], description: '', requiredSkills: [], location: draftJob.location, isRemote: false, status: 'DRAFT', salaryRange: '' });
     setPostStep(1);
     setActiveTab('LISTINGS');
     refreshData();
@@ -558,6 +559,20 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
              </select>
            </div>
            <div className="space-y-2">
+             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Expected Salary Range (Monthly)</label>
+             <select 
+               value={draftJob.salaryRange || ''}
+               onChange={e => setDraftJob(d => ({ ...d, salaryRange: e.target.value }))}
+               className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none focus:border-emerald-500"
+             >
+               <option value="" disabled>Select range</option>
+               <option value="₦100,000 - ₦200,000">₦100,000 - ₦200,000</option>
+               <option value="₦200,000 - ₦350,000">₦200,000 - ₦350,000</option>
+               <option value="₦350,000 - ₦500,000">₦350,000 - ₦500,000</option>
+               <option value="₦500,000+">₦500,000+</option>
+             </select>
+           </div>
+           <div className="space-y-2">
              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Description</label>
              <textarea 
                rows={6}
@@ -629,6 +644,9 @@ const EmployerDashboard: React.FC<EmployerDashboardProps> = ({ user, onUpdateUse
               <div className="flex flex-wrap gap-2">
                 <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-[10px] font-black uppercase tracking-widest text-emerald-600">{draftJob.industry}</span>
                 <span className="px-3 py-1 bg-white border border-gray-100 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400">{draftJob.isRemote ? 'Remote' : 'On-site'}</span>
+                {draftJob.salaryRange && (
+                   <span className="px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full text-[10px] font-black uppercase tracking-widest text-emerald-700">{draftJob.salaryRange}</span>
+                )}
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">{draftJob.description}</p>
               <div className="pt-4 border-t border-gray-100">

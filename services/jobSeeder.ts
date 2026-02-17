@@ -59,12 +59,14 @@ const GEO_REGISTRY = [
 ];
 
 const EMPLOYERS = [
-  "Dangote Refinery", "IITA Ibadan", "Sterling Bank", "Lagos Health Service", 
+  "Dangote Group", "IITA Ibadan", "Sterling Bank", "Lagos Health Service", 
   "Julius Berger", "MTN Nigeria", "Olam Agriculture", "TotalEnergies", 
-  "BUA Group", "MainOne", "GIG Logistics", "Kobo360", "Interswitch"
+  "BUA Group", "MainOne", "GIG Logistics", "Kobo360", "Interswitch",
+  "Nigeria LNG", "Access Bank", "Honeywell Flour Mills", "Arise News",
+  "Zinox Technologies", "Andela", "Flutterwave", "Paystack"
 ];
 
-const ROLE_PREFIXES = ["Senior", "Lead", "Junior", "Specialist", "Officer", "Supervisor"];
+const ROLE_PREFIXES = ["Senior", "Lead", "Junior", "Specialist", "Officer", "Supervisor", "Field", "Project"];
 
 /**
  * Generates a robust set of jobs for MVP seeding.
@@ -90,11 +92,37 @@ export function generateSeedJobs(): Job[] {
     const prefix = ROLE_PREFIXES[i % ROLE_PREFIXES.length];
     const title = `${prefix} ${skill}`;
 
-    const costOfLivingMultiplier = (stateData.name === 'Lagos' || stateData.name === 'Abuja (FCT)') ? 1.5 : 1.0;
-    const baseSalary = industry === 'Technology' ? 220000 : 95000;
-    const expMultiplier = (i % 3 === 0) ? 2.5 : (i % 3 === 1) ? 1.5 : 1.0;
+    // Industry-aware remote logic
+    // Tech: 20% Remote | Others: 5% Remote
+    let isRemote = false;
+    if (industry === 'Technology') {
+      isRemote = i % 5 === 0;
+    } else {
+      isRemote = i % 20 === 0;
+    }
+
+    const costOfLivingMultiplier = (stateData.name === 'Lagos' || stateData.name === 'Abuja (FCT)') ? 1.4 : 1.0;
+    const baseSalary = industry === 'Technology' ? 180000 : 85000;
+    const expMultiplier = (i % 3 === 0) ? 2.2 : (i % 3 === 1) ? 1.4 : 1.0;
+    
     const lowRange = Math.floor(baseSalary * expMultiplier * costOfLivingMultiplier);
-    const highRange = Math.floor(lowRange * 1.4);
+    const highRange = Math.floor(lowRange * 1.5);
+
+    // Contextual description based on industry and onsite/remote status
+    let description = '';
+    const onsiteNote = isRemote ? "This is a fully remote position." : `This is a strictly onsite role located at our facility in ${city}, ${stateData.name}.`;
+
+    if (industry === 'Technology') {
+      description = `We are seeking a ${title} to join our high-growth engineering team. ${onsiteNote} You will work on building scalable solutions for our pan-African user base. Expertise in ${skill} is essential for success in this role.`;
+    } else if (industry === 'Construction') {
+      description = `Join our major infrastructure project in ${stateData.name}. ${onsiteNote} We need a skilled ${skill} expert to ensure structural integrity and safety standards are met on the field. Physical presence at the ${city} site is mandatory.`;
+    } else if (industry === 'Agriculture') {
+      description = `As a ${title}, you will be at the heart of our food security mission. ${onsiteNote} Your work in ${skill} will help optimize yield and distribution across the region. Field work in ${city} is a core part of this responsibility.`;
+    } else if (industry === 'Healthcare') {
+      description = `Our medical facility in ${city} requires an experienced ${title}. ${onsiteNote} We are committed to providing top-tier patient care through excellence in ${skill}. Requires valid professional certification.`;
+    } else if (industry === 'Transportation') {
+      description = `Managing logistics across the ${zoneData.zone} requires precision and dedication. ${onsiteNote} As a ${title}, you will handle critical ${skill} operations to keep Nigeria moving. Shift work may be required.`;
+    }
 
     const job: Job = {
       id: `job-${i.toString().padStart(5, '0')}`,
@@ -102,7 +130,7 @@ export function generateSeedJobs(): Job[] {
       employerName: EMPLOYERS[i % EMPLOYERS.length],
       title: title,
       industry: industry,
-      description: `We are looking for a qualified ${title} to join our team in ${stateData.name}. As a ${skill} professional, you will be responsible for operational excellence in the ${city} district. Deep expertise in ${skill} is mandatory for this role.`,
+      description: description,
       requiredSkills: [skill],
       location: {
         state: stateData.name,
@@ -111,7 +139,7 @@ export function generateSeedJobs(): Job[] {
         lat: 0,
         lon: 0
       },
-      isRemote: i % 15 === 0, 
+      isRemote: isRemote,
       status: 'OPEN',
       createdAt: new Date(Date.now() - (i * 1000 * 60 * 5)).toISOString(),
       salaryRange: `₦${lowRange.toLocaleString()} - ₦${highRange.toLocaleString()}`

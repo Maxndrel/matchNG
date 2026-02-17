@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, memo, useCallback } from 'react';
 import { MatchResult, ApplicationStatus } from '../types';
-import { MapPin, Globe, Star, CheckCircle2, Loader2, Cloud, Zap } from 'lucide-react';
+import { MapPin, Globe, Star, CheckCircle2, Loader2, Cloud, Zap, Wallet, Award } from 'lucide-react';
 import { addPendingAction, saveApplication, getActiveUser } from '../services/storage';
 
 interface JobCardProps {
@@ -15,12 +15,14 @@ interface JobCardProps {
 }
 
 const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplied, isSaved }) => {
-  const { job, scoreFinal } = match;
+  const { job, scoreFinal, scoreSkill } = match;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
+    setUser(getActiveUser());
     if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
       setIsOnline(navigator.onLine);
       const handleStatus = () => setIsOnline(navigator.onLine);
@@ -43,8 +45,8 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     e.stopPropagation();
     if (isApplied || isProcessing) return;
 
-    const user = getActiveUser();
-    if (!user) return;
+    const currentUser = getActiveUser();
+    if (!currentUser) return;
 
     if (!isOnline) {
       addPendingAction({ 
@@ -52,7 +54,7 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
         payload: { 
           jobId: job.id, 
           employerId: job.employerId,
-          seekerName: user.fullName,
+          seekerName: currentUser.fullName,
           jobTitle: job.title
         } 
       });
@@ -67,11 +69,11 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     saveApplication({
       id: `app-${Date.now()}`,
       jobId: job.id,
-      seekerId: user.id,
+      seekerId: currentUser.id,
       employerId: job.employerId,
       status: ApplicationStatus.PENDING,
       timestamp: new Date().toISOString(),
-      seekerName: user.fullName,
+      seekerName: currentUser.fullName,
       jobTitle: job.title
     });
 
@@ -92,8 +94,10 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
     setFeedback(!isSaved ? 'Job Bookmarked!' : 'Removed Bookmark');
   }, [job.id, onSave, isSaved, isOnline]);
 
+  const isPrimarySkillMatch = user?.primarySkill && job.requiredSkills.includes(user.primarySkill);
+
   return (
-    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:border-emerald-100 transition-all duration-500 overflow-hidden flex flex-col group h-full relative">
+    <div className={`bg-white rounded-[2.5rem] border ${isPrimarySkillMatch ? 'border-emerald-200 ring-4 ring-emerald-500/5' : 'border-gray-100'} shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden flex flex-col group h-full relative`}>
       {feedback && (
         <div className="absolute top-4 left-4 right-4 z-20 animate-in slide-in-from-top-2 fade-in duration-300">
           <div className="bg-gray-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-white/10">
@@ -106,7 +110,14 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
       <div className="p-6 md:p-8 flex-grow space-y-5">
         <div className="flex justify-between items-start gap-4">
           <div className="space-y-1 overflow-hidden">
-            <span className="inline-block text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{job.industry}</span>
+            <div className="flex items-center gap-2">
+              <span className="inline-block text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{job.industry}</span>
+              {isPrimarySkillMatch && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-white bg-emerald-600 px-2.5 py-1 rounded-full shadow-sm">
+                  <Award className="w-3 h-3" /> Expertise Match
+                </span>
+              )}
+            </div>
             <h3 className="text-xl md:text-2xl font-black text-gray-900 leading-tight pt-2 truncate group-hover:text-emerald-700 transition-colors">{job.title}</h3>
             <p className="text-gray-500 font-bold text-sm truncate">{job.employerName}</p>
           </div>
@@ -121,6 +132,12 @@ const JobCard: React.FC<JobCardProps> = memo(({ match, onApply, onSave, isApplie
              <MapPin className="w-3.5 h-3.5 text-gray-400" />
              <span className="text-[11px] font-bold text-gray-600 uppercase tracking-tight">{job.location.city}</span>
           </div>
+          {job.salaryRange && (
+            <div className="flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 text-emerald-700">
+               <Wallet className="w-3.5 h-3.5" />
+               <span className="text-[11px] font-black uppercase tracking-tight">{job.salaryRange}</span>
+            </div>
+          )}
           {job.isRemote && (
             <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 text-blue-700 uppercase tracking-tighter text-[9px] font-black">Remote</div>
           )}
